@@ -19,6 +19,25 @@ interface ScoutReportProps {
 
 export default function ScoutReport({ player, onClose, onDraft, onRelease, isDrafted }: ScoutReportProps) {
   const avgStats = PositionAverages[player.position];
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Tab') return;
+      const buttons = Array.from(dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') || []);
+      const first = buttons[0];
+      const last = buttons.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('keydown', handleKey); previous?.focus(); };
+  }, [onClose]);
 
   // Dynamic scouting commentary based on position and key stats
   const getScoutInsights = (): string => {
@@ -71,13 +90,13 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
     const pathString = `M ${points.map((p) => `${p.x} ${p.y}`).join(' L ')}`;
 
     return (
-      <div className="flex flex-col bg-[#0A0A0C]/40 p-3 rounded-lg border border-white/[0.08]">
+      <div className="flex flex-col bg-[#0B1423]/40 p-3 rounded-lg border border-white/[0.08]">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-[#3ECF8E]" />
+          <span className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-[#F48B56]" />
             Recent Form Trend
           </span>
-          <span className="text-xs font-mono font-bold text-[#F2F2F0]">
+          <span className="text-xs font-sans font-bold text-[#F2EADB]">
             Avg: {(form.reduce((a, b) => a + b, 0) / form.length).toFixed(2)}
           </span>
         </div>
@@ -92,12 +111,12 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
               opacity="0.1"
             />
             {/* Sparkline */}
-            <path d={pathString} fill="none" stroke="#3ECF8E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={pathString} fill="none" stroke="#F48B56" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             {/* Dots */}
             {points.map((p, i) => (
               <g key={i}>
-                <circle cx={p.x} cy={p.y} r="3.5" fill="#0A0A0C" stroke="#3ECF8E" strokeWidth="1.5" />
-                <text x={p.x} y={p.y - 6} fill="#F2F2F0" fontSize="8" textAnchor="middle" fontWeight="bold">
+                <circle cx={p.x} cy={p.y} r="3.5" fill="#0B1423" stroke="#F48B56" strokeWidth="1.5" />
+                <text x={p.x} y={p.y - 6} fill="#F2EADB" fontSize="8" textAnchor="middle" fontWeight="bold">
                   {form[i].toFixed(1)}
                 </text>
               </g>
@@ -105,15 +124,15 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
             {/* Defs */}
             <defs>
               <linearGradient id="sparkline-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3ECF8E" />
-                <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0" />
+                <stop offset="0%" stopColor="#F48B56" />
+                <stop offset="100%" stopColor="#F48B56" stopOpacity="0" />
               </linearGradient>
             </defs>
           </svg>
           <div className="flex flex-col text-right">
-            <span className="text-[10px] font-mono text-[#8A8A93] uppercase">Status</span>
-            <span className="text-xs font-semibold text-[#3ECF8E] flex items-center gap-1 mt-0.5 justify-end">
-              <Star className="w-3.5 h-3.5 fill-[#3ECF8E]/25" /> Active
+            <span className="text-xs font-sans text-[#A6B1C3] uppercase">Status</span>
+            <span className="text-xs font-semibold text-[#F48B56] flex items-center gap-1 mt-0.5 justify-end">
+              <Star className="w-3.5 h-3.5 fill-[#F48B56]/25" /> Active
             </span>
           </div>
         </div>
@@ -122,32 +141,32 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
   };
 
   return (
-    <div id={`scout-report-overlay-${player.id}`} className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0C]/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-4xl bg-[#131316] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`Scout report for ${player.name}`} tabIndex={-1} id={`scout-report-overlay-${player.id}`} className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1423]/80 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-4xl bg-[#142238] border border-white/[0.08] rounded-2xl shadow-lg overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
         {/* Left pane: Player Header Card & Radar Chart */}
         <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-white/[0.08] overflow-y-auto">
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+                <span className={`px-2 py-0.5 rounded text-xs font-sans font-bold uppercase tracking-wider ${
                   player.position === 'GK' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                   player.position === 'DEF' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                   player.position === 'MID' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                  'bg-[#3ECF8E]/10 text-[#3ECF8E] border border-[#3ECF8E]/20'
+                  'bg-[#F48B56]/10 text-[#F48B56] border border-[#F48B56]/20'
                 }`}>
                   {player.position}
                 </span>
-                <span className="text-xs text-[#8A8A93] font-mono">{player.club} • {player.nationality}</span>
+                <span className="text-xs text-[#A6B1C3] font-sans">{player.club} • {player.nationality}</span>
               </div>
-              <h2 className="text-2xl font-bold text-[#F2F2F0] tracking-tight mt-1">{player.name}</h2>
+              <h2 className="text-2xl font-bold text-[#F2EADB] tracking-tight mt-1">{player.name}</h2>
             </div>
             
             <div className="flex flex-col items-end">
-              <div className="text-3xl font-extrabold text-[#F2F2F0] flex items-baseline gap-1">
+              <div className="text-3xl font-extrabold text-[#F2EADB] flex items-baseline gap-1">
                 {player.rating}
-                <span className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider">OVR</span>
+                <span className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider">OVR</span>
               </div>
-              <span className="text-xs font-mono text-[#3ECF8E] mt-1 font-semibold">{player.price} CREDITS</span>
+              <span className="text-xs font-sans text-[#F48B56] mt-1 font-semibold">{player.price} CREDITS</span>
             </div>
           </div>
 
@@ -157,10 +176,10 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
         </div>
 
         {/* Right pane: Advanced stats, Sparkline, Insights & Actions */}
-        <div className="w-full md:w-[420px] p-6 bg-[#0A0A0C]/40 flex flex-col justify-between overflow-y-auto">
+        <div className="w-full md:w-[420px] p-6 bg-[#0B1423]/40 flex flex-col justify-between overflow-y-auto">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-[#8A8A93] hover:text-[#F2F2F0] transition-colors border border-white/[0.08]"
+            className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-[#A6B1C3] hover:text-[#F2EADB] transition-colors border border-white/[0.08]"
             id={`close-scout-report-${player.id}`}
           >
             <X className="w-4 h-4" />
@@ -168,44 +187,44 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
 
           <div className="space-y-5">
             <div>
-              <h3 className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider mb-2">Technical Profile</h3>
+              <h3 className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider mb-2">Technical Profile</h3>
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                  <span className="text-xs text-[#8A8A93] font-medium">Pace</span>
-                  <span className="text-sm font-mono font-bold text-[#F2F2F0]">{player.stats.pace}</span>
+                <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                  <span className="text-xs text-[#A6B1C3] font-medium">Pace</span>
+                  <span className="text-sm font-sans font-bold text-[#F2EADB]">{player.stats.pace}</span>
                 </div>
-                <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                  <span className="text-xs text-[#8A8A93] font-medium">Dribbling</span>
-                  <span className="text-sm font-mono font-bold text-[#F2F2F0]">{player.stats.dribbling}</span>
+                <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                  <span className="text-xs text-[#A6B1C3] font-medium">Dribbling</span>
+                  <span className="text-sm font-sans font-bold text-[#F2EADB]">{player.stats.dribbling}</span>
                 </div>
-                <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                  <span className="text-xs text-[#8A8A93] font-medium">Pass Accuracy</span>
-                  <span className="text-sm font-mono font-bold text-[#F2F2F0]">{player.stats.passAccuracy}%</span>
+                <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                  <span className="text-xs text-[#A6B1C3] font-medium">Pass Accuracy</span>
+                  <span className="text-sm font-sans font-bold text-[#F2EADB]">{player.stats.passAccuracy}%</span>
                 </div>
-                <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                  <span className="text-xs text-[#8A8A93] font-medium">Stamina</span>
-                  <span className="text-sm font-mono font-bold text-[#F2F2F0]">{player.stats.stamina}</span>
+                <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                  <span className="text-xs text-[#A6B1C3] font-medium">Stamina</span>
+                  <span className="text-sm font-sans font-bold text-[#F2EADB]">{player.stats.stamina}</span>
                 </div>
                 {player.position !== 'GK' ? (
                   <>
-                    <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                      <span className="text-xs text-[#8A8A93] font-medium">xG / 90</span>
-                      <span className="text-sm font-mono font-bold text-[#3ECF8E]">{player.stats.xG90.toFixed(2)}</span>
+                    <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                      <span className="text-xs text-[#A6B1C3] font-medium">xG / 90</span>
+                      <span className="text-sm font-sans font-bold text-[#F48B56]">{player.stats.xG90.toFixed(2)}</span>
                     </div>
-                    <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                      <span className="text-xs text-[#8A8A93] font-medium">xA / 90</span>
-                      <span className="text-sm font-mono font-bold text-blue-400">{player.stats.xA90.toFixed(2)}</span>
+                    <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                      <span className="text-xs text-[#A6B1C3] font-medium">xA / 90</span>
+                      <span className="text-sm font-sans font-bold text-blue-400">{player.stats.xA90.toFixed(2)}</span>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                      <span className="text-xs text-[#8A8A93] font-medium">GK Reflexes</span>
-                      <span className="text-sm font-mono font-bold text-amber-400">{player.stats.defense}</span>
+                    <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                      <span className="text-xs text-[#A6B1C3] font-medium">GK Reflexes</span>
+                      <span className="text-sm font-sans font-bold text-amber-400">{player.stats.defense}</span>
                     </div>
-                    <div className="bg-[#0A0A0C]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
-                      <span className="text-xs text-[#8A8A93] font-medium">Pass Launching</span>
-                      <span className="text-sm font-mono font-bold text-[#F2F2F0]">{player.stats.passAccuracy}</span>
+                    <div className="bg-[#0B1423]/30 p-2.5 rounded-lg border border-white/[0.08] flex items-center justify-between">
+                      <span className="text-xs text-[#A6B1C3] font-medium">Pass Launching</span>
+                      <span className="text-sm font-sans font-bold text-[#F2EADB]">{player.stats.passAccuracy}</span>
                     </div>
                   </>
                 )}
@@ -217,7 +236,7 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
 
             {/* Playstyle traits */}
             <div>
-              <h3 className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <h3 className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
                 Aesthetic playstyles
               </h3>
@@ -225,7 +244,7 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
                 {player.playstyles.map((style, i) => (
                   <span
                     key={i}
-                    className="px-2 py-1 bg-[#0A0A0C]/50 hover:bg-[#0A0A0C]/80 transition-colors border border-white/[0.08] text-[10px] font-mono text-[#F2F2F0] rounded flex items-center gap-1"
+                    className="px-2 py-1 bg-[#0B1423]/50 hover:bg-[#0B1423]/80 transition-colors border border-white/[0.08] text-xs font-sans text-[#F2EADB] rounded flex items-center gap-1"
                   >
                     <Award className="w-3 h-3 text-amber-500" />
                     {style}
@@ -235,12 +254,12 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
             </div>
 
             {/* Scout insights summary */}
-            <div className="bg-[#0A0A0C]/25 p-3.5 rounded-lg border border-white/[0.08]">
-              <span className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+            <div className="bg-[#0B1423]/25 p-3.5 rounded-lg border border-white/[0.08]">
+              <span className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
                 Scout Insights
               </span>
-              <p className="text-xs text-[#8A8A93] leading-relaxed font-normal">
+              <p className="text-xs text-[#A6B1C3] leading-relaxed font-normal">
                 {getScoutInsights()}
               </p>
             </div>
@@ -268,7 +287,7 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
                     onDraft();
                     onClose();
                   }}
-                  className="flex-1 py-2.5 px-4 bg-[#3ECF8E] hover:bg-[#3ECF8E]/90 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg hover:shadow-[#3ECF8E]/20 font-sans cursor-pointer"
+                  className="flex-1 py-2.5 px-4 bg-[#F48B56] hover:bg-[#F48B56]/90 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg hover:shadow-[#F48B56]/20 font-sans cursor-pointer"
                   id={`scout-draft-btn-${player.id}`}
                 >
                   Draft to Squad
@@ -277,7 +296,7 @@ export default function ScoutReport({ player, onClose, onDraft, onRelease, isDra
             )}
             <button
               onClick={onClose}
-              className="px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-[#F2F2F0] border border-white/[0.08] text-xs font-medium rounded-xl transition-all font-sans cursor-pointer"
+              className="px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-[#F2EADB] border border-white/[0.08] text-xs font-medium rounded-xl transition-all font-sans cursor-pointer"
               id="scout-close-btn"
             >
               Cancel

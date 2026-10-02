@@ -1026,53 +1026,24 @@ export const DEFAULT_PRICING_WEIGHTS: PricingWeights = {
  * Calculates a dynamic valuation based on player stats and regression weights,
  * normalized so that top squad averages fit standard game budgets (e.g. max ~150-200 credits for world class).
  */
+function valuationScore(raw: RawPlayer, weights: PricingWeights): number {
+  const s = raw.stats;
+  return (raw.rating - 70) / 25 * weights.ratingWeight +
+    Math.min(s.goals / 40, 1) * weights.goalsWeight +
+    Math.min(s.assists / 20, 1) * weights.assistsWeight +
+    Math.min(s.xG90, 1) * weights.xG90Weight +
+    Math.min(s.xA90 / 0.5, 1) * weights.xA90Weight +
+    s.defense / 100 * weights.defendingWeight + s.stamina / 100 * weights.staminaWeight;
+}
+
+export function pricePlayer(player: RawPlayer, weights: PricingWeights = DEFAULT_PRICING_WEIGHTS): Player {
+  const scores = RAW_PLAYERS.map(raw => valuationScore(raw, weights));
+  const min = Math.min(...scores);
+  const range = Math.max(...scores) - min || 1;
+  const ratio = Math.max(0, Math.min(1, (valuationScore(player, weights) - min) / range));
+  return { ...player, price: Math.round(45 + ratio * 120) };
+}
+
 export function getPlayersWithDynamicPrices(weights: PricingWeights = DEFAULT_PRICING_WEIGHTS): Player[] {
-  // 1. Calculate raw score for each player
-  const rawScores = RAW_PLAYERS.map((raw) => {
-    const s = raw.stats;
-    
-    // Normalize stats to 0-1 scale
-    const normRating = (raw.rating - 70) / 25; // assumed rating range 70-95
-    const normGoals = Math.min(s.goals / 40, 1); // scale to 40 max
-    const normAssists = Math.min(s.assists / 20, 1); // scale to 20 max
-    const normXG = Math.min(s.xG90 / 1.0, 1);
-    const normXA = Math.min(s.xA90 / 0.5, 1);
-    const normDef = s.defense / 100;
-    const normStam = s.stamina / 100;
-
-    const score = 
-      normRating * weights.ratingWeight +
-      normGoals * weights.goalsWeight +
-      normAssists * weights.assistsWeight +
-      normXG * weights.xG90Weight +
-      normXA * weights.xA90Weight +
-      normDef * weights.defendingWeight +
-      normStam * weights.staminaWeight;
-
-    return { id: raw.id, score };
-  });
-
-  // Find min and max scores for scaling
-  const scores = rawScores.map((r) => r.score);
-  const minScore = Math.min(...scores);
-  const maxScore = Math.max(...scores);
-  const scoreRange = maxScore - minScore || 1;
-
-  // Scale values to fit budget constraints
-  const MIN_PRICE = 45;
-  const MAX_PRICE = 165;
-
-  return RAW_PLAYERS.map((raw) => {
-    const itemScoreObj = rawScores.find((rs) => rs.id === raw.id);
-    const score = itemScoreObj ? itemScoreObj.score : minScore;
-    
-    // Linear interpolation
-    const ratio = (score - minScore) / scoreRange;
-    const price = Math.round(MIN_PRICE + ratio * (MAX_PRICE - MIN_PRICE));
-
-    return {
-      ...raw,
-      price,
-    };
-  });
+  return RAW_PLAYERS.map(player => pricePlayer(player, weights));
 }

@@ -101,12 +101,12 @@ export default function RadarChart({ player, averageStats }: RadarChartProps) {
   const avgPolygonString = avgPoints.map((p) => `${p.x},${p.y}`).join(' ');
 
   return (
-    <div id={`radar-${player.id}`} className="flex flex-col items-center bg-[#131316]/50 p-4 rounded-xl border border-white/[0.08]">
+    <div id={`radar-${player.id}`} className="flex flex-col items-center bg-[#142238]/50 p-4 rounded-xl border border-white/[0.08]">
       <div className="text-center mb-2">
-        <h4 className="text-xs font-mono tracking-wider text-slate-400 uppercase">Scout Performance Index</h4>
+        <h4 className="text-xs font-sans tracking-wider text-slate-400 uppercase">Scout Performance Index</h4>
         <div className="flex items-center justify-center gap-4 mt-1 text-xs">
-          <span className="flex items-center gap-1.5 text-[#3ECF8E] font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#3ECF8E]/80 border border-[#3ECF8E]"></span>
+          <span className="flex items-center gap-1.5 text-[#F48B56] font-medium">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#F48B56]/80 border border-[#F48B56]"></span>
             {player.name}
           </span>
           <span className="flex items-center gap-1.5 text-slate-400">
@@ -160,7 +160,7 @@ export default function RadarChart({ player, averageStats }: RadarChartProps) {
             const labelY = cy + labelDist * Math.sin(angle);
 
             // Determine text alignment
-            let textAnchor = 'middle';
+            let textAnchor: 'middle' | 'start' | 'end' = 'middle';
             if (Math.cos(angle) > 0.1) textAnchor = 'start';
             else if (Math.cos(angle) < -0.1) textAnchor = 'end';
 
@@ -204,8 +204,8 @@ export default function RadarChart({ player, averageStats }: RadarChartProps) {
           {/* Player Polygon (Foreground) */}
           <polygon
             points={playerPolygonString}
-            fill="rgba(62, 207, 142, 0.25)"
-            stroke="rgba(62, 207, 142, 0.85)"
+            fill="rgba(244, 139, 86, 0.25)"
+            stroke="rgba(244, 139, 86, 0.85)"
             strokeWidth="2"
           />
 
@@ -216,8 +216,8 @@ export default function RadarChart({ player, averageStats }: RadarChartProps) {
                 cx={pt.x}
                 cy={pt.y}
                 r="4"
-                fill="#3ECF8E"
-                stroke="#3ECF8E"
+                fill="#F48B56"
+                stroke="#F48B56"
                 strokeWidth="1.5"
               />
               <title>{`${axes[i].label}: ${axes[i].playerValue}`}</title>
@@ -230,10 +230,10 @@ export default function RadarChart({ player, averageStats }: RadarChartProps) {
         {axes.map((axis, i) => {
           const diff = axis.playerValue - axis.averageValue;
           return (
-            <div key={i} className="flex flex-col items-center p-1.5 bg-[#0A0A0C]/40 rounded border border-white/[0.03]">
-              <span className="text-[9px] font-mono tracking-wider text-slate-500 uppercase">{axis.label}</span>
+            <div key={i} className="flex flex-col items-center p-1.5 bg-[#0B1423]/40 rounded border border-white/[0.03]">
+              <span className="text-xs font-sans tracking-wider text-slate-400 uppercase">{axis.label}</span>
               <span className="text-xs font-semibold text-slate-200 mt-0.5">{axis.playerValue}</span>
-              <span className={`text-[9px] font-mono mt-0.5 ${diff >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}`}>
+              <span className={`text-xs font-sans mt-0.5 ${diff >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}`}>
                 {diff >= 0 ? `+${diff}` : diff}
               </span>
             </div>

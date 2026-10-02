@@ -136,15 +136,15 @@ export default function SquadPitch({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="flex flex-col h-full bg-[#131316] border border-white/[0.08] rounded-2xl overflow-hidden relative shadow-2xl"
+      className="flex flex-col h-full bg-[#142238] border border-white/[0.08] rounded-2xl overflow-hidden relative shadow-lg"
     >
       {/* Pitch Header Metrics */}
-      <div className="bg-[#131316] border-b border-white/[0.08] p-4 flex items-center justify-between z-10">
+      <div className="bg-[#142238] border-b border-white/[0.08] p-4 flex items-center justify-between z-10">
         <div>
-          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Dynamic Squad Metrics</span>
-          <h3 className="text-sm font-semibold text-slate-200 mt-0.5">Active Formulation: {formation}</h3>
+          <span className="text-xs font-sans text-slate-400 uppercase tracking-wider">THE STARTING XI</span>
+          <h3 className="text-sm font-semibold text-slate-200 mt-0.5">On the touchline · {formation}</h3>
           {!selectedSlotId && (
-            <p className="text-[11px] font-mono text-slate-500 tracking-wide mt-1">
+            <p className="text-xs font-sans text-slate-400 tracking-wide mt-1">
               Click a player to swap positions, click an empty slot to search
             </p>
           )}
@@ -152,52 +152,52 @@ export default function SquadPitch({
 
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-end leading-none">
-            <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">OVR Rating</span>
+            <span className="text-xs font-sans text-slate-400 uppercase tracking-wider">OVR Rating</span>
             <span className="text-lg font-black text-slate-100 mt-1 flex items-baseline gap-0.5">
               {getAverageRating()}
-              <span className="text-[10px] font-mono text-slate-500">OVR</span>
+              <span className="text-xs font-sans text-slate-400">OVR</span>
             </span>
           </div>
 
           <div className="h-6 w-px bg-white/[0.08]" />
 
           <div className="flex flex-col items-end leading-none">
-            <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">Tactical Chem</span>
+            <span className="text-xs font-sans text-slate-400 uppercase tracking-wider">Tactical Chem</span>
             <span className={`text-lg font-black mt-1 flex items-baseline gap-0.5 ${
-              chemistry >= 70 ? 'text-[#3ECF8E]' : chemistry >= 40 ? 'text-amber-400' : 'text-slate-400'
+              chemistry >= 70 ? 'text-[#F48B56]' : chemistry >= 40 ? 'text-amber-400' : 'text-slate-400'
             }`}>
               {chemistry}
-              <span className="text-[10px] font-mono text-slate-500">%</span>
+              <span className="text-xs font-sans text-slate-400">%</span>
             </span>
           </div>
         </div>
       </div>
 
       {/* The 2D Tactical Field Stage */}
-      <div className="flex-1 relative min-h-[460px] bg-gradient-to-b from-[#0A0A0C] via-[#0D0D10] to-[#131316] border-b border-white/[0.08] flex items-center justify-center p-4 overflow-hidden select-none">
+      <div className="tactical-pitch flex-1 relative min-h-[460px] bg-gradient-to-b from-[#0B1423] via-[#0F1B2E] to-[#142238] border-b border-white/[0.08] flex items-center justify-center p-4 overflow-hidden select-none">
         {/* Swapping Instructions overlay banner */}
         {selectedSlotId && (() => {
           const selectedSlot = layout.find(s => s.id === selectedSlotId);
           const selectedPlayerId = slotAssignments[selectedSlotId];
           const selectedPlayer = selectedPlayerId ? players.find(p => p.id === selectedPlayerId) : null;
           return (
-            <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-[#131316] border px-3.5 py-1.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-mono ${
-              swapError ? 'border-rose-500/40' : 'border-[#3ECF8E]/30'
+            <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-[#142238] border px-3.5 py-1.5 rounded-xl shadow-xl flex items-center gap-2 text-xs font-sans ${
+              swapError ? 'border-rose-500/40' : 'border-[#F48B56]/30'
             }`}>
               <span className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${swapError ? 'bg-rose-500' : 'bg-[#3ECF8E]'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${swapError ? 'bg-rose-500' : 'bg-[#3ECF8E]'}`}></span>
+                <span className={` absolute inline-flex h-full w-full rounded-full opacity-75 ${swapError ? 'bg-rose-500' : 'bg-[#F48B56]'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${swapError ? 'bg-rose-500' : 'bg-[#F48B56]'}`}></span>
               </span>
               {swapError ? (
                 <span className="text-rose-300">{swapError}</span>
               ) : (
                 <span className="text-slate-300">
-                  Click another slot to move/swap <strong className="text-[#3ECF8E]">{selectedPlayer?.name.split(' ').pop() || 'Player'}</strong> ({selectedSlot?.label})
+                  Click another slot to move/swap <strong className="text-[#F48B56]">{selectedPlayer?.name.split(' ').pop() || 'Player'}</strong> ({selectedSlot?.label})
                 </span>
               )}
               <button 
                 onClick={() => { setSelectedSlotId(null); setSwapError(null); }}
-                className="ml-2 text-slate-500 hover:text-slate-200 font-bold px-1 rounded hover:bg-white/[0.08]"
+                className="ml-2 text-slate-400 hover:text-slate-200 font-bold px-1 rounded hover:bg-white/[0.08]"
               >
                 ✕
               </button>
@@ -209,21 +209,21 @@ export default function SquadPitch({
         <div className="absolute inset-4 opacity-15 pointer-events-none z-0">
           <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
             {/* Outer boundary */}
-            <rect x="0" y="0" width="100" height="100" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
+            <rect x="0" y="0" width="100" height="100" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
             {/* Halfway line */}
-            <line x1="0" y1="50" x2="100" y2="50" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
             {/* Center circle */}
-            <circle cx="50" cy="50" r="15" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
-            <circle cx="50" cy="50" r="1" fill="#3ECF8E" fillOpacity="0.5" />
+            <circle cx="50" cy="50" r="15" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
+            <circle cx="50" cy="50" r="1" fill="#F48B56" fillOpacity="0.5" />
             {/* Penalty boxes */}
             {/* Top Box (Away team side) */}
-            <rect x="20" y="0" width="60" height="18" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
-            <rect x="35" y="0" width="30" height="6" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
-            <path d="M 40 18 Q 50 23 60 18" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
+            <rect x="20" y="0" width="60" height="18" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
+            <rect x="35" y="0" width="30" height="6" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
+            <path d="M 40 18 Q 50 23 60 18" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
             {/* Bottom Box (Home team side) */}
-            <rect x="20" y="82" width="60" height="18" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
-            <rect x="35" y="94" width="30" height="6" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
-            <path d="M 40 82 Q 50 77 60 82" fill="none" stroke="#3ECF8E" strokeWidth="1" strokeOpacity="0.3" />
+            <rect x="20" y="82" width="60" height="18" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
+            <rect x="35" y="94" width="30" height="6" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
+            <path d="M 40 82 Q 50 77 60 82" fill="none" stroke="#F48B56" strokeWidth="1" strokeOpacity="0.3" />
           </svg>
         </div>
 
@@ -249,12 +249,12 @@ export default function SquadPitch({
                     <div className="relative">
                       <button
                         onClick={() => handleSlotClick(slot.id, true)}
-                        className={`w-12 h-12 rounded-full bg-[#131316] border-2 text-slate-100 flex items-center justify-center font-black text-sm transition-all shadow-lg hover:shadow-[#3ECF8E]/10 shadow-black cursor-pointer ${
+                        className={`w-12 h-12 rounded-full bg-[#142238] border-2 text-slate-100 flex items-center justify-center font-black text-sm transition-all shadow-lg hover:shadow-[#F48B56]/10 shadow-black cursor-pointer ${
                           selectedSlotId === slot.id
-                            ? 'border-[#3ECF8E] ring-4 ring-[#3ECF8E]/40 ring-offset-2 ring-offset-[#0A0A0C] scale-110 animate-pulse'
+                            ? 'border-[#F48B56] ring-4 ring-[#F48B56]/40 ring-offset-2 ring-offset-[#0B1423] scale-110 '
                             : selectedSlotId
-                              ? 'border-amber-500/50 hover:border-[#3ECF8E] hover:scale-105'
-                              : 'border-[#3ECF8E]/80 hover:border-[#3ECF8E] hover:scale-105'
+                              ? 'border-amber-500/50 hover:border-[#F48B56] hover:scale-105'
+                              : 'border-[#F48B56]/80 hover:border-[#F48B56] hover:scale-105'
                         }`}
                         id={`pitch-node-${player.id}`}
                       >
@@ -268,14 +268,14 @@ export default function SquadPitch({
                             slot.y < 25 ? 'top-full mt-2' : 'bottom-full mb-2'
                           }`}
                         >
-                          <div className="bg-[#131316] border border-[#3ECF8E]/30 rounded-xl p-2 flex items-center gap-1 shadow-2xl whitespace-nowrap">
+                          <div className="bg-[#142238] border border-[#F48B56]/30 rounded-xl p-2 flex items-center gap-1 shadow-lg whitespace-nowrap">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 setShowPositionSelector(showPositionSelector?.slotId === slot.id ? null : { slotId: slot.id, x: rect.left, y: rect.top });
                               }}
-                              className="p-1 hover:bg-[#3ECF8E]/15 text-[#3ECF8E] hover:text-[#3ECF8E] rounded cursor-pointer"
+                              className="p-1 hover:bg-[#F48B56]/15 text-[#F48B56] hover:text-[#F48B56] rounded cursor-pointer"
                               title="Change Position"
                             >
                               <PlusCircle className="w-3.5 h-3.5" />
@@ -285,7 +285,7 @@ export default function SquadPitch({
                                 e.stopPropagation();
                                 onScout(player);
                               }}
-                              className="p-1 hover:bg-[#3ECF8E]/15 text-[#3ECF8E] hover:text-[#3ECF8E] rounded cursor-pointer"
+                              className="p-1 hover:bg-[#F48B56]/15 text-[#F48B56] hover:text-[#F48B56] rounded cursor-pointer"
                               title="Detailed Scout Report"
                             >
                               <Info className="w-3.5 h-3.5" />
@@ -308,11 +308,11 @@ export default function SquadPitch({
                     </div>
 
                     {/* Player Label Text block */}
-                    <div className="mt-1 bg-[#131316]/95 border border-white/[0.08] rounded py-0.5 px-2 text-center shadow shadow-black min-w-[70px] max-w-[100px] z-10 pointer-events-none">
-                      <p className="text-[10px] font-bold text-slate-200 truncate leading-tight">
+                    <div className="mt-1 bg-[#142238]/95 border border-white/[0.08] rounded py-0.5 px-2 text-center shadow shadow-black min-w-[70px] max-w-[100px] z-10 pointer-events-none">
+                      <p className="text-xs font-bold text-slate-200 truncate leading-tight">
                         {player.name.split(' ').pop()}
                       </p>
-                      <p className="text-[8px] font-mono text-[#3ECF8E] leading-none mt-0.5">
+                      <p className="text-xs font-sans text-[#F48B56] leading-none mt-0.5">
                         {slot.label}
                       </p>
                     </div>
@@ -329,14 +329,14 @@ export default function SquadPitch({
                 >
                   <div className={`w-10 h-10 rounded-full border border-dashed flex items-center justify-center transition-all ${
                     selectedSlotId 
-                      ? 'border-[#3ECF8E]/80 animate-pulse bg-[#3ECF8E]/10' 
-                      : 'border-white/[0.15] bg-[#131316]/40 hover:bg-[#131316]/85 hover:border-white/[0.3]'
+                      ? 'border-[#F48B56]/80  bg-[#F48B56]/10' 
+                      : 'border-white/[0.15] bg-[#142238]/40 hover:bg-[#142238]/85 hover:border-white/[0.3]'
                   }`}>
                     <PlusCircle className={`w-4 h-4 transition-transform ${
-                      selectedSlotId ? 'text-[#3ECF8E] rotate-45 scale-110' : 'text-slate-600 group-hover:text-slate-400'
+                      selectedSlotId ? 'text-[#F48B56] rotate-45 scale-110' : 'text-slate-400 group-hover:text-slate-400'
                     }`} />
                   </div>
-                  <span className="mt-1 text-[8px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors bg-[#0A0A0C]/40 px-1 rounded">
+                  <span className="mt-1 text-xs font-sans text-slate-400 group-hover:text-slate-300 transition-colors bg-[#0B1423]/40 px-1 rounded">
                     {slot.label}
                   </span>
                 </button>
@@ -347,12 +347,12 @@ export default function SquadPitch({
       </div>
 
       {/* Field Footer Panel: Squad constraints check */}
-      <div className="bg-[#131316] p-4 border-t border-white/[0.08] flex items-center justify-between text-xs font-mono text-slate-500 z-10">
+      <div className="bg-[#142238] p-4 border-t border-white/[0.08] flex items-center justify-between text-xs font-sans text-slate-400 z-10">
         <span className="flex items-center gap-1.5">
-          <Award className="w-4 h-4 text-[#3ECF8E]" />
-          Manager Squad validation:
+          <Award className="w-4 h-4 text-[#F48B56]" />
+          Matchday squad:
         </span>
-        <span className={players.length === 11 ? 'text-[#3ECF8E] font-bold' : 'text-slate-400'}>
+        <span className={players.length === 11 ? 'text-[#F48B56] font-bold' : 'text-slate-400'}>
           {players.length} / 11 Players Drafted
         </span>
       </div>
@@ -364,11 +364,11 @@ export default function SquadPitch({
           onClick={() => setShowPositionSelector(null)}
         >
           <div 
-            className="bg-[#131316] border border-[#3ECF8E]/30 rounded-xl p-4 shadow-2xl min-w-[200px]"
+            className="bg-[#142238] border border-[#F48B56]/30 rounded-xl p-4 shadow-lg min-w-[200px]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-mono text-[#8A8A93] uppercase tracking-wider">Change Position</span>
+              <span className="text-xs font-sans text-[#A6B1C3] uppercase tracking-wider">Change Position</span>
               <button
                 onClick={() => setShowPositionSelector(null)}
                 className="p-1 hover:bg-white/[0.08] text-slate-400 hover:text-slate-200 rounded transition-colors"
@@ -384,7 +384,7 @@ export default function SquadPitch({
                 // GK validation: prevent non-GK from changing to GK position
                 const isGKPosition = pos === 'GK';
                 const isCurrentPlayerGK = currentPlayer.position === 'GK';
-                const canChangePosition = !isGKPosition || (isGKPosition && isCurrentPlayerGK);
+                const canChangePosition = isGKPosition === isCurrentPlayerGK;
                 
                 return (
                   <button
@@ -397,12 +397,12 @@ export default function SquadPitch({
                       setShowPositionSelector(null);
                     }}
                     disabled={!canChangePosition}
-                    className={`py-2 px-3 rounded-lg text-sm font-mono font-bold transition-all cursor-pointer ${
+                    className={`py-2 px-3 rounded-lg text-sm font-sans font-bold transition-all cursor-pointer ${
                       currentPlayer.position === pos 
-                        ? 'bg-[#3ECF8E] text-slate-950 border border-[#3ECF8E]' 
+                        ? 'bg-[#F48B56] text-slate-950 border border-[#F48B56]' 
                         : canChangePosition
-                          ? 'bg-[#0A0A0C] hover:bg-[#3ECF8E] hover:text-slate-950 border border-white/[0.08] hover:border-[#3ECF8E] text-[#F2F2F0]'
-                          : 'bg-[#0A0A0C]/30 border-white/[0.04] text-slate-600 cursor-not-allowed opacity-50'
+                          ? 'bg-[#0B1423] hover:bg-[#F48B56] hover:text-slate-950 border border-white/[0.08] hover:border-[#F48B56] text-[#F2EADB]'
+                          : 'bg-[#0B1423]/30 border-white/[0.04] text-slate-400 cursor-not-allowed opacity-50'
                     }`}
                     title={canChangePosition ? `Change to ${pos}` : 'Only goalkeepers can play in GK position'}
                   >

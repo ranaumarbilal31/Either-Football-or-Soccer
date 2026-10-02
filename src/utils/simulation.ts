@@ -1,3 +1,4 @@
+import { resolveAssignments } from './squad';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -205,13 +206,17 @@ export function simulateMatch(
   slotAssignments: Record<string, string>
 ): MatchResult {
   // Ensure we have 11 players for simulation. If not, generate fill-ins
-  const homeSquad = [...userPlayers];
+  const homeSquad = userPlayers.filter((p, i) => userPlayers.findIndex(q => q.id === p.id) === i).slice(0, 11);
+  const layout = getFormationLayout(userTactics.formation);
+  const assignments = resolveAssignments(homeSquad, userTactics.formation, slotAssignments);
   while (homeSquad.length < 11) {
-    const fillerId = `filler-${homeSquad.length}`;
+    const slot = layout.find(s => !assignments[s.id])!;
+    const fillerId = `reserve-${slot.id}`;
+    assignments[slot.id] = fillerId;
     homeSquad.push({
       id: fillerId,
       name: `Reserve Player ${homeSquad.length + 1}`,
-      position: 'MID',
+      position: slot.positionType,
       rating: 70,
       price: 50,
       stats: { goals: 0, assists: 0, passAccuracy: 75, defense: 60, physicality: 65, stamina: 70, pace: 65, dribbling: 65, xG90: 0.1, xA90: 0.1 },
@@ -232,13 +237,13 @@ export function simulateMatch(
   const awayTempo = opposition.tactics.tempo;
 
   // Resolve positional slots for every player in the home squad
-  const layout = getFormationLayout(userTactics.formation);
   const homeSquadWithSlots = homeSquad.map((player) => {
-    const slotId = Object.keys(slotAssignments).find((key) => slotAssignments[key] === player.id);
+    const slotId = Object.keys(assignments).find((key) => assignments[key] === player.id);
     const slot = slotId ? layout.find((s) => s.id === slotId) : null;
     return {
       player,
       slotLabel: slot ? slot.label : player.position,
+      deployedPosition: slot ? slot.positionType : player.position,
     };
   });
 
@@ -319,7 +324,7 @@ export function simulateMatch(
   const lambda_home = Math.max(2.0, Math.min(18.0, (homeQuality / awayQuality) * 5.8 * tempoChanceMultiplier * chemistryMultiplier * coherenceFactor));
   
   // Lambda away depends on opposition quality vs user defense
-  const homeDefenders = homeSquad.filter(p => p.position === 'DEF');
+  const homeDefenders = homeSquadWithSlots.filter(item => item.deployedPosition === 'DEF').map(item => item.player);
   const homeDefRating = homeDefenders.reduce((acc, p) => acc + p.rating, 0) / Math.max(1, homeDefenders.length);
   const lambda_away = Math.max(2.0, Math.min(18.0, (awayQuality / (homeDefRating + (chemistry / 12))) * 5.8 * (1 + (homeDefLine - 50) / 200)));
 
@@ -379,18 +384,18 @@ export function simulateMatch(
     minMomentum = Math.max(-100, Math.min(100, minMomentum));
     momentum.push({ minute: min, value: Math.round(minMomentum) });
 
-    // Simulate passive/passing stats during non-shot minutes
+    // Every attempted pass contributes to both player and team totals.
+    const passesThisMinute = Math.max(1, Math.round(7 - homeTempo / 30 + Math.random() * 3));
+    for (let pass = 0; pass < passesThisMinute; pass++) {
+      const player = homeSquad[Math.floor(Math.random() * homeSquad.length)];
+      playerStatsMap[player.id].passesAttempted++;
+      const accuracy = Math.max(0, Math.min(100, player.stats.passAccuracy - homeTempo / 8 - (100 - homeStaminaMap[player.id]) / 10));
+      if (Math.random() * 100 < accuracy) playerStatsMap[player.id].passesCompleted++;
+    }
+    // Simulate tackles during non-shot minutes.
     if (!homeShotMinutes.has(min) && !awayShotMinutes.has(min)) {
-      if (Math.random() < 0.25) {
-        // Add random tackles/passes
-        const midfielder = homeSquad[Math.floor(Math.random() * homeSquad.length)];
-        playerStatsMap[midfielder.id].passesAttempted += 1;
-        if (Math.random() < midfielder.stats.passAccuracy / 100) {
-          playerStatsMap[midfielder.id].passesCompleted += 1;
-        }
-      }
       if (Math.random() < 0.15) {
-        const defender = homeSquad.filter(p => p.position === 'DEF')[Math.floor(Math.random() * homeDefenders.length)] || homeSquad[0];
+        const defender = homeDefenders[Math.floor(Math.random() * homeDefenders.length)] || homeSquad[0];
         playerStatsMap[defender.id].tackles += 1;
       }
     }
@@ -401,9 +406,9 @@ export function simulateMatch(
 
       // Weighted shooter selection (FWD: 10x, MID: 4x, DEF: 1x)
       const shooterWeights = homeSquadWithSlots.map((item) => {
-        let weight = 1.0;
-        if (item.player.position === 'FWD') weight = 10.0;
-        else if (item.player.position === 'MID') weight = 4.0;
+        let weight = item.deployedPosition === 'GK' ? 0 : 1;
+        if (item.deployedPosition === 'FWD') weight = 10.0;
+        else if (item.deployedPosition === 'MID') weight = 4.0;
         return { item, weight };
       });
       const totalWeight = shooterWeights.reduce((acc, w) => acc + w.weight, 0);
@@ -545,6 +550,7 @@ export function simulateMatch(
             minute: min,
             type: 'SHOT',
             team: 'AWAY',
+            xG: finalAwayXG,
             description: `${min}' - Outstanding save by ${homeGKItem.player.name}! They get a strong hand to tip an opposition shot from (${shotX}, ${shotY}) over the bar. (xG: ${finalAwayXG.toFixed(2)})`,
           });
         }
@@ -553,7 +559,8 @@ export function simulateMatch(
           minute: min,
           type: 'SHOT',
           team: 'AWAY',
-          description: `${min}' - Big chance missed! Opposition forward skies their shot high into the stands from close range. (xG: ${finalAwayXG.toFixed(2)})`,
+          xG: finalAwayXG,
+          description: `${min}' - Big chance missed! Opposition forward skies their shot high into the stands from (${shotX}, ${shotY}). (xG: ${finalAwayXG.toFixed(2)})`,
         });
       }
     }
@@ -582,13 +589,12 @@ export function simulateMatch(
   if (opposition.tactics.tempo < 40) finalHomePossession -= 5;
   stats.possession = Math.max(30, Math.min(70, Math.round(finalHomePossession)));
 
-  stats.passes.home = Math.round(300 + (stats.possession * 6) - userTactics.tempo * 1.5);
+  stats.passes.home = Object.values(playerStatsMap).reduce((sum, player) => sum + player.passesAttempted, 0);
   stats.passes.away = Math.round(300 + ((100 - stats.possession) * 6) - opposition.tactics.tempo * 1.5);
 
   let avgStamina = homeSquad.reduce((acc, p) => acc + homeStaminaMap[p.id], 0) / 11;
-  stats.passAccuracy.home = Math.round(
-    homeSquad.reduce((acc, p) => acc + p.stats.passAccuracy, 0) / 11 - (userTactics.tempo / 8) - (100 - avgStamina) / 10
-  );
+  stats.passAccuracy.home = Math.round(100 * Object.values(playerStatsMap).reduce((sum, player) => sum + player.passesCompleted, 0) / Math.max(1, stats.passes.home));
+  stats.passAccuracy.home = Math.max(0, Math.min(100, stats.passAccuracy.home));
   stats.passAccuracy.away = Math.round(83 - opposition.tactics.tempo / 8);
 
   stats.fouls.home = Math.round(4 + homePressing / 12 + Math.random() * 4);
@@ -612,7 +618,7 @@ export function simulateMatch(
     // SHAP Contribution Values
     let staminaContribution = -((100 - staminaLeft) / 45); 
     let pressingContribution = (homePressing - 50) / 150; 
-    let passingContribution = (pStats.passesCompleted - (pStats.passesAttempted * 0.2)) * 0.15;
+    let passingContribution = pStats.passesAttempted ? (pStats.passesCompleted / pStats.passesAttempted - 0.75) * 3 : 0;
     let defendingContribution = pStats.tackles * 0.45;
     let attackingContribution = (pStats.goals * 1.8) + (pStats.assists * 1.2) + (pStats.shots * 0.2);
 
@@ -638,9 +644,9 @@ export function simulateMatch(
       goals: pStats.goals,
       assists: pStats.assists,
       shots: pStats.shots,
-      passesCompleted: pStats.passesCompleted || Math.round(stats.passes.home / 11 * 0.8),
-      passesAttempted: pStats.passesAttempted || Math.round(stats.passes.home / 11),
-      tackles: pStats.tackles || Math.round(stats.fouls.home / 6),
+      passesCompleted: pStats.passesCompleted,
+      passesAttempted: pStats.passesAttempted,
+      tackles: pStats.tackles,
       staminaRemaining: staminaLeft,
       shapValues: {
         stamina: parseFloat(staminaContribution.toFixed(2)),

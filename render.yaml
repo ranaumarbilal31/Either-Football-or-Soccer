@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: Either-Football-or-Soccer
+    runtime: node
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: AI_DAILY_REQUEST_LIMIT
+        value: "200"

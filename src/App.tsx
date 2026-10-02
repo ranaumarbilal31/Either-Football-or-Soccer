@@ -1,6 +1,10 @@
+import { readStored, writeStored } from './utils/storage';
+import { isPlayer, isSquad, isTactics, isRecord, inRange } from './utils/validation';
+import { calculateSquadChemistry } from './utils/chemistry';
+import { resolveAssignments, autofillSquad } from './utils/squad';
 import React, { useState, useEffect } from 'react';
 import { 
-  getPlayersWithDynamicPrices, 
+  getPlayersWithDynamicPrices, pricePlayer,
   DEFAULT_PRICING_WEIGHTS, 
   PricingWeights 
 } from './data/players';
@@ -36,105 +40,43 @@ export default function App() {
     restDelta: 0.001
   });
 
-  useEffect(() => {
-    const sessionKey = 'football-app-session-id';
-    const currentSession = sessionStorage.getItem(sessionKey);
-    
-    if (!currentSession) {
-      localStorage.clear();
-      sessionStorage.setItem(sessionKey, Date.now().toString());
-    }
-  }, []);
-
-  const [isFreshSession, setIsFreshSession] = useState(true);
-
-  useEffect(() => {
-    const sessionKey = 'football-app-session-id';
-    const currentSession = sessionStorage.getItem(sessionKey);
-    
-    if (currentSession && isFreshSession) {
-      setIsFreshSession(false);
-    }
-  }, [isFreshSession]);
-
   const [weights, setWeights] = useState<PricingWeights>(() => {
-    const saved = localStorage.getItem('pricing_weights');
-    return saved ? JSON.parse(saved) : DEFAULT_PRICING_WEIGHTS;
+    return readStored('pricing_weights', DEFAULT_PRICING_WEIGHTS, v => isRecord(v) && Object.keys(DEFAULT_PRICING_WEIGHTS).every(k => inRange(v[k], 0, 1)));
   });
   const [showWeightsConfig, setShowWeightsConfig] = useState(false);
 
-  const [playersList, setPlayersList] = useState<Player[]>([]);
-  useEffect(() => {
-    setPlayersList(getPlayersWithDynamicPrices(weights));
-  }, [weights]);
-
   const [customPlayers, setCustomPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem('custom_scouted_players');
-    return saved ? JSON.parse(saved) : [];
+    return readStored<Player[]>('custom_scouted_players', [], v => Array.isArray(v) && v.every(isPlayer));
   });
 
   useEffect(() => {
-    localStorage.setItem('custom_scouted_players', JSON.stringify(customPlayers));
+    writeStored('custom_scouted_players', customPlayers);
   }, [customPlayers]);
 
-  const [players, setPlayers] = useState<Player[]>([]);
-  useEffect(() => {
-    const basePlayers = getPlayersWithDynamicPrices(weights);
-    
-    const pricedCustom = customPlayers.map((p) => {
-      const s = p.stats;
-      const normRating = (p.rating - 70) / 25;
-      const normGoals = Math.min(s.goals / 40, 1);
-      const normAssists = Math.min(s.assists / 20, 1);
-      const normXG = Math.min(s.xG90 / 1.0, 1);
-      const normXA = Math.min(s.xA90 / 0.5, 1);
-      const normDef = s.defense / 100;
-      const normStam = s.stamina / 100;
-
-      const score = 
-        normRating * weights.ratingWeight +
-        normGoals * weights.goalsWeight +
-        normAssists * weights.assistsWeight +
-        normXG * weights.xG90Weight +
-        normXA * weights.xA90Weight +
-        normDef * weights.defendingWeight +
-        normStam * weights.staminaWeight;
-
-      const minPossibleScore = 0.05;
-      const maxPossibleScore = 0.85;
-      const range = maxPossibleScore - minPossibleScore;
-      const ratio = Math.max(0, Math.min((score - minPossibleScore) / range, 1));
-      const price = Math.round(45 + ratio * (165 - 45));
-
-      return {
-        ...p,
-        price,
-      };
-    });
-
-    setPlayers([...basePlayers, ...pricedCustom]);
-  }, [weights, customPlayers]);
+  const players = React.useMemo(() => [
+    ...getPlayersWithDynamicPrices(weights), ...customPlayers.map(player => pricePlayer(player, weights))
+  ], [weights, customPlayers]);
 
   const handleImportLivePlayer = (newPlayer: Player) => {
-    if (customPlayers.some(p => p.id === newPlayer.id || p.name.toLowerCase() === newPlayer.name.toLowerCase())) {
+    if (players.some(p => p.id === newPlayer.id || p.name.toLowerCase() === newPlayer.name.toLowerCase())) {
       triggerAlert('error', `${newPlayer.name} is already in your scouting catalog!`);
-      return;
+      return false;
     }
     setCustomPlayers(prev => [newPlayer, ...prev]);
+    return true;
   };
 
-  const [activeDraftTab, setActiveDraftTab] = useState<'roster' | 'live-analytics'>('live-analytics');
+  const [activeDraftTab, setActiveDraftTab] = useState<'roster' | 'live-analytics'>('roster');
 
-  const [draftedPlayers, setDraftedPlayers] = useState<Player[]>([]);
+  const [draftedPlayers, setDraftedPlayers] = useState<Player[]>(() => readStored('drafted_players', [], isSquad));
 
   const [tactics, setTactics] = useState<Tactics>(() => {
-    const saved = localStorage.getItem('squad_tactics');
-    return saved ? JSON.parse(saved) : {
+    return readStored<Tactics>('squad_tactics', {
       formation: '4-3-3',
       defensiveLine: 50,
       tempo: 50,
       pressingIntensity: 50
-    };
+    }, isTactics);
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,51 +87,15 @@ export default function App() {
   const [alertMessage, setAlertMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
 
   const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('slot_assignments');
-    return saved ? JSON.parse(saved) : {};
+    return readStored('slot_assignments', {}, v => isRecord(v) && Object.values(v).every(id => typeof id === 'string'));
   });
 
   useEffect(() => {
-    localStorage.setItem('slot_assignments', JSON.stringify(slotAssignments));
+    writeStored('slot_assignments', slotAssignments);
   }, [slotAssignments]);
 
   useEffect(() => {
-    const currentLayout = getFormationLayout(tactics.formation);
-    const newAssignments = { ...slotAssignments };
-
-    Object.keys(newAssignments).forEach((slotId) => {
-      const playerId = newAssignments[slotId];
-      if (!draftedPlayers.some((p) => p.id === playerId)) {
-        delete newAssignments[slotId];
-      }
-    });
-
-    Object.keys(newAssignments).forEach((slotId) => {
-      if (!currentLayout.some((s) => s.id === slotId)) {
-        delete newAssignments[slotId];
-      }
-    });
-
-    draftedPlayers.forEach((player) => {
-      const isAssigned = Object.values(newAssignments).includes(player.id);
-      if (!isAssigned) {
-        const emptySlot = currentLayout.find(
-          (slot) => slot.positionType === player.position && !newAssignments[slot.id]
-        );
-        if (emptySlot) {
-          newAssignments[emptySlot.id] = player.id;
-        } else {
-          const anyEmptySlot = currentLayout.find((slot) => !newAssignments[slot.id]);
-          if (anyEmptySlot) {
-            newAssignments[anyEmptySlot.id] = player.id;
-          }
-        }
-      }
-    });
-
-    if (JSON.stringify(newAssignments) !== JSON.stringify(slotAssignments)) {
-      setSlotAssignments(newAssignments);
-    }
+    setSlotAssignments(prev => resolveAssignments(draftedPlayers, tactics.formation, prev));
   }, [draftedPlayers, tactics.formation]);
 
   const nationalities = React.useMemo(() => {
@@ -201,48 +107,18 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'draft' | 'simulation' | 'debrief'>('draft');
   const [simulationResult, setSimulationResult] = useState<MatchResult | null>(null);
 
-  const calculateChemistry = (): number => {
-    if (draftedPlayers.length < 2) return 0;
-    let chem = 0;
-    const clubs: Record<string, number> = {};
-    const nationalities: Record<string, number> = {};
-
-    draftedPlayers.forEach((p) => {
-      clubs[p.club] = (clubs[p.club] || 0) + 1;
-      nationalities[p.nationality] = (nationalities[p.nationality] || 0) + 1;
-    });
-
-    Object.values(nationalities).forEach((count) => {
-      if (count >= 2) chem += (count - 1) * 6;
-    });
-
-    Object.values(clubs).forEach((count) => {
-      if (count >= 2) chem += (count - 1) * 10;
-    });
-
-    const hasTargetMan = draftedPlayers.some((p) => p.playstyles.includes('Target Man'));
-    const hasHighCrossing = draftedPlayers.some((p) => p.playstyles.includes('High Crossing'));
-    const hasDoublePivot = draftedPlayers.filter((p) => p.playstyles.includes('Double Pivot')).length >= 2;
-    const hasWingBack = draftedPlayers.some((p) => p.playstyles.includes('Wing Back'));
-    const hasBoxToBox = draftedPlayers.some((p) => p.playstyles.includes('Box-to-Box'));
-
-    if (hasTargetMan && hasHighCrossing) chem += 15;
-    if (hasDoublePivot) chem += 10;
-    if (hasWingBack && hasBoxToBox) chem += 8;
-
-    return Math.min(chem, 100);
-  };
+  const calculateChemistry = () => calculateSquadChemistry(draftedPlayers, tactics.formation, slotAssignments);
 
   useEffect(() => {
-    localStorage.setItem('drafted_players', JSON.stringify(draftedPlayers));
+    writeStored('drafted_players', draftedPlayers);
   }, [draftedPlayers]);
 
   useEffect(() => {
-    localStorage.setItem('squad_tactics', JSON.stringify(tactics));
+    writeStored('squad_tactics', tactics);
   }, [tactics]);
 
   useEffect(() => {
-    localStorage.setItem('pricing_weights', JSON.stringify(weights));
+    writeStored('pricing_weights', weights);
   }, [weights]);
 
   const triggerAlert = (type: 'error' | 'success', text: string) => {
@@ -253,29 +129,27 @@ export default function App() {
   };
 
   const handlePositionChange = (player: Player, newPosition: string) => {
-    // Check if trying to place a non-GK in GK position
-    if (newPosition === 'GK' && player.position !== 'GK') {
-      triggerAlert('error', 'Only goalkeepers can be placed in the GK position!');
+    const layout = getFormationLayout(tactics.formation);
+    const source = layout.find(slot => slotAssignments[slot.id] === player.id);
+    const target = layout.find(slot => slot.positionType === newPosition && slot.id !== source?.id);
+    if (!source || !target || (player.position === 'GK') !== (newPosition === 'GK')) {
+      triggerAlert('error', 'No compatible slot available. Goalkeepers must remain in goal.');
       return;
     }
-
-    // Update the player's position
-    setDraftedPlayers(prev => 
-      prev.map(p => 
-        p.id === player.id 
-          ? { ...p, position: newPosition as PositionType }
-          : p
-      )
-    );
+    setSlotAssignments(prev => {
+      const next = { ...prev, [target.id]: player.id };
+      if (prev[target.id]) next[source.id] = prev[target.id];
+      else delete next[source.id];
+      return next;
+    });
   };
 
   const [budgetLimit, setBudgetLimit] = useState<number>(() => {
-    const saved = localStorage.getItem('budget_limit');
-    return saved ? parseInt(saved, 10) : 1000;
+    return readStored('budget_limit', 1000, v => inRange(v, 500, 5000));
   });
 
   useEffect(() => {
-    localStorage.setItem('budget_limit', budgetLimit.toString());
+    writeStored('budget_limit', budgetLimit);
   }, [budgetLimit]);
 
   const totalCost = draftedPlayers.reduce((acc, p) => acc + p.price, 0);
@@ -297,6 +171,10 @@ export default function App() {
   };
 
   const handleDraftPlayer = (player: Player) => {
+    if (draftedPlayers.length >= 11) {
+      triggerAlert('error', 'Squad is already full. Release a player first.');
+      return;
+    }
     if (totalCost + player.price > budgetLimit) {
       triggerAlert('error', `Insufficient budget. ${player.name} costs ${player.price} cr, but only ${remainingBudget} cr is remaining.`);
       return;
@@ -331,46 +209,9 @@ export default function App() {
   };
 
   const handleAutofillSquad = () => {
-    const requirements = getFormationRequiredCounts();
-    let currentSquad = [...draftedPlayers];
-    let currentCost = currentSquad.reduce((acc, p) => acc + p.price, 0);
-
-    const positions: PositionType[] = ['GK', 'DEF', 'MID', 'FWD'];
-    let filledAny = false;
-
-    for (const pos of positions) {
-      const needed = requirements[pos];
-      const currentCount = currentSquad.filter(p => p.position === pos).length;
-      
-      if (currentCount < needed) {
-        const slotsToFill = needed - currentCount;
-        
-        const undraftedCandidates = players
-          .filter(p => p.position === pos && !currentSquad.some(s => s.id === p.id))
-          .sort((a, b) => b.rating - a.rating);
-
-        let candidatesAdded = 0;
-        for (const candidate of undraftedCandidates) {
-          if (candidatesAdded >= slotsToFill) break;
-          
-          if (currentCost + candidate.price <= budgetLimit) {
-            currentSquad.push(candidate);
-            currentCost += candidate.price;
-            candidatesAdded++;
-            filledAny = true;
-          }
-        }
-      }
-    }
-
-    if (filledAny) {
-      setDraftedPlayers(currentSquad);
-      triggerAlert('success', 'Squad successfully autofilled with top-tier players!');
-    } else if (currentSquad.length === 11) {
-      triggerAlert('error', 'Squad is already full!');
-    } else {
-      triggerAlert('error', 'Insufficient remaining budget to autofill the squad with quality players!');
-    }
+    const next = autofillSquad(draftedPlayers, players, tactics.formation, budgetLimit);
+    setDraftedPlayers(next);
+    triggerAlert(next.length === 11 ? 'success' : 'error', next.length === 11 ? 'Squad filled within your budget.' : 'Budget or available players cannot fill every slot. Increase the budget or release a player.');
   };
 
   const handleLoadPresetSquad = (name: string, isClub: boolean) => {
@@ -381,7 +222,7 @@ export default function App() {
       presetFormation = '3-5-2';
     }
 
-    setTactics(prev => ({ ...prev, formation: presetFormation }));
+
 
     const teamPlayers = players.filter(p => isClub ? p.club === name : p.nationality === name);
 
@@ -417,6 +258,13 @@ export default function App() {
       }
     });
 
+    const cost = selected.reduce((sum, player) => sum + player.price, 0);
+    if (cost > budgetLimit) {
+      triggerAlert('error', `This preset costs ${cost} cr. Increase your budget to load it.`);
+      return;
+    }
+    setTactics(prev => ({ ...prev, formation: presetFormation }));
+    setSlotAssignments({});
     setDraftedPlayers(selected);
     triggerAlert('success', `Drafted full ${name} preset squad in a ${presetFormation} formation!`);
   };
@@ -451,88 +299,32 @@ export default function App() {
   const reqCounts = getFormationRequiredCounts();
 
   return (
-    <div className="min-h-screen bg-[#0A0A0C] text-[#F2F2F0] flex flex-col font-sans selection:bg-[#3ECF8E] selection:text-[#0A0A0C] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B1423] text-[#F2EADB] flex flex-col font-sans selection:bg-[#F48B56] selection:text-[#0B1423] relative overflow-hidden">
       <div className="ambient-orb ambient-orb-1" />
       <div className="ambient-orb ambient-orb-2" />
       
-      <header className="bg-[#0A0A0C]/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-30 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-16 h-16 shrink-0">
-              <img src="/logo.webp" alt="Either Football or Soccer logo" className="h-full w-full object-contain" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-[#FAFAF8] flex items-center gap-2">
-                Either Football or Soccer
-              </h1>
-              <p className="text-xs font-mono text-[#8A8A93] mt-0.5">
-                Build Your Dream XI, Simulate Matches, and Analyze Performance with AI Insights
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 bg-[#131316] border border-white/8 p-3 rounded-xl min-w-[320px]">
-            <Coins className="w-5 h-5 text-[#3ECF8E] animate-pulse shrink-0" />
-            <div className="flex-1">
-              <div className="flex justify-between items-center text-[10px] font-mono uppercase text-[#9C9CA4] mb-1">
-                <span>Roster Budget Allocation</span>
-                <span className="font-bold text-[#3ECF8E]">{remainingBudget} / {budgetLimit} cr</span>
-              </div>
-              <div className="w-full bg-[#0A0A0C] h-2 rounded-full overflow-hidden border border-white/8">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    remainingBudget < 100 ? 'bg-rose-500' : remainingBudget < 300 ? 'bg-amber-500' : 'bg-[#3ECF8E]'
-                  }`}
-                  style={{ width: `${Math.min((totalCost / budgetLimit) * 100, 100)}%` }}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between gap-1 mt-2 pt-1.5 border-t border-white/8">
-                <span className="text-[9px] font-mono text-[#8A8A93]">Adjust Limit:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setBudgetLimit(prev => Math.max(500, prev - 100))}
-                    className="px-1.5 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[10px] font-mono rounded text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-                    title="Decrease Budget by 100 cr"
-                  >
-                    -100 cr
-                  </button>
-                  <button
-                    onClick={() => setBudgetLimit(prev => Math.max(500, prev - 250))}
-                    className="px-1.5 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[10px] font-mono rounded text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-                    title="Decrease Budget by 250 cr"
-                  >
-                    -250 cr
-                  </button>
-                  <div className="h-3 w-px bg-slate-800 mx-0.5" />
-                  <button
-                    onClick={() => setBudgetLimit(prev => Math.min(5000, prev + 100))}
-                    className="px-1.5 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[10px] font-mono rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
-                    title="Increase Budget by 100 cr"
-                  >
-                    +100 cr
-                  </button>
-                  <button
-                    onClick={() => setBudgetLimit(prev => Math.min(5000, prev + 250))}
-                    className="px-1.5 py-0.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[10px] font-mono rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
-                    title="Increase Budget by 250 cr"
-                  >
-                    +250 cr
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+      <header className="club-header">
+        <div className="club-header-inner">
+          <a className="club-brand" href="/" aria-label="Either Football or Soccer home">
+            <span className="club-crest"><img src="/logo.webp" width="64" height="64" alt="Either Football or Soccer crest" /></span>
+            <div><h1>Either Football <span>or Soccer</span></h1><p>YOUR CLUB. YOUR CALL.</p></div>
+          </a>
+          <div className="header-season"><span className="season-mark">XI</span><div>THE FOOTBALL LAB<small>Draft / Tactics / Matchday</small></div></div>
         </div>
       </header>
-
-      <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#3ECF8E] to-emerald-400 origin-left z-50"
-        style={{ scaleX }}
-      />
+      {currentView === 'draft' && <section className="club-hero">
+        <div className="hero-copy"><span className="section-kicker">WELCOME TO THE TOUCHLINE</span><h2>BUILD YOUR<br /><span>BEST XI.</span></h2><p>Scout the talent. Set the shape. Own the match.<br />Your next great team starts here.</p><div className="hero-meta"><span>{players.length} players to discover</span><span>5 formations. Endless possibilities.</span></div></div>
+        <div className="squad-scoreboard">
+          <div className="scoreboard-heading"><span>MANAGER'S DESK</span><span className="squad-stamp">{draftedPlayers.length === 11 ? 'XI READY' : 'BUILDING XI'}</span></div>
+          <div className="scoreboard-stats"><div><strong>{String(draftedPlayers.length).padStart(2, '0')}<small>/11</small></strong><span>PLAYERS SIGNED</span></div><div><strong>{calculateChemistry()}<small>%</small></strong><span>SQUAD CHEMISTRY</span></div><div><strong>{tactics.formation}</strong><span>FORMATION</span></div></div>
+          <div className="budget-heading"><span>Transfer budget remaining</span><strong>{remainingBudget.toLocaleString()} <small>/ {budgetLimit.toLocaleString()} cr</small></strong></div>
+          <div className="budget-track"><div style={{ width: `${Math.min(100, totalCost / budgetLimit * 100)}%` }} /></div>
+          <div className="budget-controls"><span>Set your budget</span><div>{[-250, -100, 100, 250].map(change => <button key={change} title={`${change > 0 ? 'Increase' : 'Decrease'} Budget by ${Math.abs(change)} cr`} onClick={() => setBudgetLimit(prev => Math.min(5000, Math.max(500, totalCost, prev + change)))}>{change > 0 ? '+' : ''}{change}</button>)}</div></div>
+        </div>
+      </section>}
 
       {currentView === 'simulation' ? (
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+        <main className="flex-1 max-w-[1440px] w-full mx-auto p-4 md:p-6">
           <MatchSimulator
             players={draftedPlayers}
             tactics={tactics}
@@ -561,36 +353,11 @@ export default function App() {
       ) : (
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-4">
           
-          <div className="flex gap-2.5 pb-2 border-b border-white/8">
-            <button
-              onClick={() => setActiveDraftTab('live-analytics')}
-              className={`py-3 px-5 rounded-xl text-xs font-mono font-bold tracking-widest uppercase transition-all cursor-pointer flex items-center gap-2 relative ${
-                activeDraftTab === 'live-analytics'
-                  ? 'bg-[#3ECF8E] text-[#0A0A0C] shadow-md shadow-[#3ECF8E]/10'
-                  : 'bg-[#131316] border border-white/8 hover:border-white/16 text-[#F2F2F0]'
-              }`}
-              id="mode-tab-analytics"
-            >
-              <Activity className="w-4 h-4 animate-pulse text-[#3ECF8E]" />
-              Live AI Analytics Hub
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveDraftTab('roster')}
-              className={`py-3 px-5 rounded-xl text-xs font-mono font-bold tracking-widest uppercase transition-all cursor-pointer flex items-center gap-2 ${
-                activeDraftTab === 'roster'
-                  ? 'bg-[#3ECF8E] text-[#0A0A0C] shadow-md shadow-[#3ECF8E]/10'
-                  : 'bg-[#131316] border border-white/8 hover:border-white/16 text-[#F2F2F0]'
-              }`}
-              id="mode-tab-squad"
-            >
-              <Award className="w-4 h-4" />
-              Squad Builder & Roster
-            </button>
-          </div>
+          <nav className="workspace-tabs" aria-label="Workspace">
+            <button id="mode-tab-squad" aria-pressed={activeDraftTab === 'roster'} onClick={() => setActiveDraftTab('roster')}><span>01</span> Squad Builder & Roster <Award size={18} /></button>
+            <button id="mode-tab-analytics" aria-pressed={activeDraftTab === 'live-analytics'} onClick={() => setActiveDraftTab('live-analytics')}><span>02</span> Live AI Analytics Hub <Activity size={18} /></button>
+            <span className="workspace-label">THE GAME PLAN STARTS HERE</span>
+          </nav>
 
           <AnimatePresence mode="wait">
             {activeDraftTab === 'live-analytics' ? (
@@ -604,6 +371,7 @@ export default function App() {
                 <LiveAnalyticsHub
                   onAddPlayerToCatalog={handleImportLivePlayer}
                   playersCatalog={players}
+                weights={weights}
                   tactics={tactics}
                   chemistry={calculateChemistry()}
                   triggerAlert={triggerAlert}
@@ -617,20 +385,20 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="grid grid-cols-1 lg:grid-cols-12 gap-6"
               >
-                <div className="lg:col-span-7 flex flex-col space-y-4">
-          <div className="bg-[#131316] border border-white/8 rounded-2xl p-4 flex flex-col gap-4 shadow-xl relative">
+                <div className="lg:col-span-7 catalog-column flex flex-col space-y-4">
+          <div className="bg-[#142238] border border-white/8 rounded-2xl p-4 flex flex-col gap-4 shadow-xl relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-[#9C9CA4]" />
+                <Search className="w-4 h-4 text-[#B0BACB]" />
                 <div>
-                  <h2 className="text-sm font-bold tracking-tight text-[#FAFAF8]">Player Scouting Hub</h2>
-                  <p className="text-[10px] text-[#8A8A93] font-mono mt-0.5">500+ Top League Players Preloaded</p>
+                  <h2 className="text-sm font-bold tracking-tight text-[#FFF7E9]">The Scouting Room</h2>
+                  <p className="text-xs text-[#A6B1C3] font-sans mt-0.5">Static player catalog · Game attributes</p>
                 </div>
               </div>
               
               <button
                 onClick={() => setShowWeightsConfig(!showWeightsConfig)}
-                className="flex items-center gap-1.5 py-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 border border-slate-700/50 rounded-lg text-xs font-mono transition-all cursor-pointer"
+                className="flex items-center gap-1.5 py-1 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-slate-100 border border-slate-700/50 rounded-lg text-xs font-sans transition-all cursor-pointer"
                 id="toggle-pricing-config"
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -649,8 +417,8 @@ export default function App() {
                 >
                   <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                        <Award className="w-4 h-4 text-emerald-500" />
+                      <span className="text-xs font-sans text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-orange-500" />
                         Regression Weights Configuration
                       </span>
                       <button
@@ -662,62 +430,62 @@ export default function App() {
                         <RefreshCw className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 leading-normal font-normal">
+                    <p className="text-xs text-slate-400 leading-normal font-normal">
                       Weights dynamically compute relative market pricing for each athlete. Normalization fits the 1000 credit cap.
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">OVR Rating ({Math.round(weights.ratingWeight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">OVR Rating ({Math.round(weights.ratingWeight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.ratingWeight}
                           onChange={(e) => setWeights({ ...weights, ratingWeight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">Goals ({Math.round(weights.goalsWeight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">Goals ({Math.round(weights.goalsWeight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.goalsWeight}
                           onChange={(e) => setWeights({ ...weights, goalsWeight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">Assists ({Math.round(weights.assistsWeight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">Assists ({Math.round(weights.assistsWeight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.assistsWeight}
                           onChange={(e) => setWeights({ ...weights, assistsWeight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">xG90 ({Math.round(weights.xG90Weight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">xG90 ({Math.round(weights.xG90Weight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.xG90Weight}
                           onChange={(e) => setWeights({ ...weights, xG90Weight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">Defending ({Math.round(weights.defendingWeight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">Defending ({Math.round(weights.defendingWeight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.defendingWeight}
                           onChange={(e) => setWeights({ ...weights, defendingWeight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-mono text-slate-500 uppercase">Stamina ({Math.round(weights.staminaWeight * 100)}%)</label>
+                        <label className="text-xs font-sans text-slate-400 uppercase">Stamina ({Math.round(weights.staminaWeight * 100)}%)</label>
                         <input 
                           type="range" min="0" max="1" step="0.05"
                           value={weights.staminaWeight}
                           onChange={(e) => setWeights({ ...weights, staminaWeight: parseFloat(e.target.value) })}
-                          className="w-full accent-emerald-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
+                          className="w-full accent-orange-500 h-1 mt-1 bg-slate-800 rounded-lg cursor-pointer"
                         />
                       </div>
                     </div>
@@ -728,14 +496,15 @@ export default function App() {
 
             <div className="flex flex-col md:flex-row gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search name, club, or nationality..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-emerald-500/80 focus:outline-none rounded-xl pl-10 pr-4 py-2 text-sm text-slate-200 transition-colors placeholder:text-slate-600"
+                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-orange-500/80 focus:outline-none rounded-xl pl-10 pr-4 py-2 text-sm text-slate-200 transition-colors placeholder:text-slate-400"
                   id="catalog-search-input"
+                  aria-label="Search player catalog"
                 />
               </div>
 
@@ -743,8 +512,9 @@ export default function App() {
                 <select
                   value={nationalityFilter}
                   onChange={(e) => setNationalityFilter(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-emerald-500/80 focus:outline-none rounded-xl px-3 py-2 text-sm text-slate-300 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-orange-500/80 focus:outline-none rounded-xl px-3 py-2 text-sm text-slate-300 transition-colors"
                   id="catalog-nation-select"
+                  aria-label="Filter by nationality"
                 >
                   <option value="ALL">Nation: All Nations</option>
                   {nationalities.filter(n => n !== 'ALL').map((nat) => (
@@ -759,8 +529,9 @@ export default function App() {
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-emerald-500/80 focus:outline-none rounded-xl px-3 py-2 text-sm text-slate-300 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-orange-500/80 focus:outline-none rounded-xl px-3 py-2 text-sm text-slate-300 transition-colors"
                   id="catalog-sort-select"
+                  aria-label="Sort player catalog"
                 >
                   <option value="rating">Sort: OVR Rating</option>
                   <option value="price_desc">Sort: Cost (High-Low)</option>
@@ -780,17 +551,17 @@ export default function App() {
                   <button
                     key={pos}
                     onClick={() => setPositionFilter(pos)}
-                    className={`py-1.5 px-3.5 rounded-lg text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    className={`py-1.5 px-3.5 rounded-lg text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                       isActive 
-                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' 
+                        ? 'bg-orange-500/15 border border-orange-500/30 text-orange-400' 
                         : 'bg-slate-950/40 border border-slate-800/60 text-slate-400 hover:text-slate-200 hover:border-slate-700'
                     }`}
                     id={`filter-tab-${pos}`}
                   >
                     {pos}
                     {pos !== 'ALL' && (
-                      <span className={`px-1 py-0.2 rounded text-[9px] ${
-                        isFulfilled ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500'
+                      <span className={`px-1 py-0.2 rounded text-xs ${
+                        isFulfilled ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800 text-slate-400'
                       }`}>
                         {draftCount}/{reqCount}
                       </span>
@@ -801,7 +572,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto max-h-[140vh] min-h-[600px] pr-1" id="players-catalog-grid">
+          <div className="flex-1 overflow-y-auto max-h-[60vh] min-h-[320px] lg:max-h-[140vh] lg:min-h-[600px] pr-1" id="players-catalog-grid">
             {filteredPlayers.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {filteredPlayers.map((player) => {
@@ -825,60 +596,60 @@ export default function App() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-12 bg-slate-900/30 border border-slate-800 border-dashed rounded-2xl text-center">
-                <p className="text-sm font-mono text-slate-400 mb-2">No players match the filter query.</p>
-                <p className="text-xs text-slate-500 max-w-sm">
-                  Can't find a specific player in the preloaded 500-player catalog? Switch to the <strong className="text-emerald-400 font-mono">Live AI Analytics Hub</strong> above to search, model, and import any custom player instantly!
+                <p className="text-sm font-sans text-slate-400 mb-2">No players match the filter query.</p>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  Can't find a specific player in the preloaded 500-player catalog? Switch to the <strong className="text-orange-400 font-sans">Live AI Analytics Hub</strong> above to search, model, and import any custom player instantly!
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="lg:col-span-5 flex flex-col space-y-4">
-          <div className="bg-[#131316] border border-white/8 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
-            <span className="text-xs font-mono font-bold text-[#9C9CA4] uppercase tracking-wider flex items-center gap-1.5">
-              <Star className="w-3.5 h-3.5 text-[#3ECF8E]" />
-              Quick-Draft Preset Squad
+        <div className="lg:col-span-5 tactics-column flex flex-col space-y-4">
+          <div className="bg-[#142238] border border-white/8 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+            <span className="text-xs font-sans font-bold text-[#B0BACB] uppercase tracking-wider flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-[#F48B56]" />
+              Start with a classic XI
             </span>
-            <p className="text-[10px] text-[#8A8A93] font-mono leading-relaxed">
+            <p className="text-xs text-[#A6B1C3] font-sans leading-relaxed">
               Instantly import a fully configured 11-player squad. Perfect for exhibition matching!
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleLoadPresetSquad('Real Madrid', true)}
-                className="py-1.5 px-2 bg-[#0A0A0C]/80 hover:bg-[#0D0D10] border border-white/8 hover:border-[#3ECF8E]/30 text-[10px] font-mono font-bold text-[#F2F2F0] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
+                className="py-1.5 px-2 bg-[#0B1423]/80 hover:bg-[#0F1B2E] border border-white/8 hover:border-[#F48B56]/30 text-xs font-sans font-bold text-[#F2EADB] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 🇪🇸 Real Madrid
               </button>
               <button
                 onClick={() => handleLoadPresetSquad('Manchester City', true)}
-                className="py-1.5 px-2 bg-[#0A0A0C]/80 hover:bg-[#0D0D10] border border-white/8 hover:border-[#3ECF8E]/30 text-[10px] font-mono font-bold text-[#F2F2F0] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
+                className="py-1.5 px-2 bg-[#0B1423]/80 hover:bg-[#0F1B2E] border border-white/8 hover:border-[#F48B56]/30 text-xs font-sans font-bold text-[#F2EADB] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 🏴󠁧󠁢󠁥󠁮󠁧󠁿 Man City
               </button>
               <button
                 onClick={() => handleLoadPresetSquad('Argentina', false)}
-                className="py-1.5 px-2 bg-[#0A0A0C]/80 hover:bg-[#0D0D10] border border-white/8 hover:border-[#3ECF8E]/30 text-[10px] font-mono font-bold text-[#F2F2F0] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
+                className="py-1.5 px-2 bg-[#0B1423]/80 hover:bg-[#0F1B2E] border border-white/8 hover:border-[#F48B56]/30 text-xs font-sans font-bold text-[#F2EADB] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 🇦🇷 Argentina
               </button>
               <button
                 onClick={() => handleLoadPresetSquad('Spain', false)}
-                className="py-1.5 px-2 bg-[#0A0A0C]/80 hover:bg-[#0D0D10] border border-white/8 hover:border-[#3ECF8E]/30 text-[10px] font-mono font-bold text-[#F2F2F0] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
+                className="py-1.5 px-2 bg-[#0B1423]/80 hover:bg-[#0F1B2E] border border-white/8 hover:border-[#F48B56]/30 text-xs font-sans font-bold text-[#F2EADB] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1"
               >
                 🇪🇸 Spain
               </button>
             </div>
           </div>
 
-          <div className="bg-[#131316] border border-white/8 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
+          <div className="bg-[#142238] border border-white/8 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
             <div className="flex items-center justify-between border-b border-white/8 pb-2">
-              <span className="text-xs font-mono font-bold text-[#9C9CA4] uppercase tracking-wider">Formation Settings</span>
+              <span className="text-xs font-sans font-bold text-[#B0BACB] uppercase tracking-wider">Your game plan</span>
               <div className="flex gap-2">
                 {draftedPlayers.length < 11 && (
                   <button
                     onClick={handleAutofillSquad}
-                    className="flex items-center gap-1 py-1 px-2.5 bg-[#3ECF8E]/10 hover:bg-[#3ECF8E]/20 border border-[#3ECF8E]/20 hover:border-[#3ECF8E]/40 text-[#3ECF8E] rounded-lg text-xs font-mono transition-all cursor-pointer font-bold animate-pulse"
+                    className="flex items-center gap-1 py-1 px-2.5 bg-[#F48B56]/10 hover:bg-[#F48B56]/20 border border-[#F48B56]/20 hover:border-[#F48B56]/40 text-[#F48B56] rounded-lg text-xs font-sans transition-all cursor-pointer font-bold "
                     id="autofill-squad-btn"
                     title="Autofill remaining empty slots"
                   >
@@ -888,7 +659,7 @@ export default function App() {
                 {draftedPlayers.length > 0 && (
                   <button
                     onClick={handleClearSquad}
-                    className="flex items-center gap-1 py-1 px-2.5 bg-rose-950/15 hover:bg-rose-950/35 border border-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-mono transition-all cursor-pointer"
+                    className="flex items-center gap-1 py-1 px-2.5 bg-rose-950/15 hover:bg-rose-950/35 border border-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-sans transition-all cursor-pointer"
                     id="clear-roster-btn"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -905,10 +676,10 @@ export default function App() {
                   onClick={() => {
                     setTactics({ ...tactics, formation: form });
                   }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                  className={`flex-1 py-2 rounded-xl text-xs font-sans font-bold border transition-all cursor-pointer ${
                     tactics.formation === form 
-                      ? 'bg-[#3ECF8E] text-[#0A0A0C] border-[#3ECF8E] shadow-md' 
-                      : 'bg-[#0A0A0C]/80 border-white/8 hover:border-white/16 text-[#F2F2F0]'
+                      ? 'bg-[#F48B56] text-[#0B1423] border-[#F48B56] shadow-md' 
+                      : 'bg-[#0B1423]/80 border-white/8 hover:border-white/16 text-[#F2EADB]'
                   }`}
                   id={`formation-select-${form}`}
                 >
@@ -918,44 +689,44 @@ export default function App() {
             </div>
 
             <div className="space-y-3.5 pt-2 border-t border-white/8">
-              <span className="text-xs font-mono font-bold text-[#9C9CA4] uppercase tracking-wider block">Tactical Sliders</span>
+              <span className="text-xs font-sans font-bold text-[#B0BACB] uppercase tracking-wider block">Tactical Sliders</span>
               
               <div className="space-y-1">
-                <div className="flex justify-between text-xs font-mono">
-                  <span className="text-[#9C9CA4]">Defensive Line</span>
-                  <span className="text-[#3ECF8E] font-bold">{tactics.defensiveLine === 50 ? 'Balanced' : tactics.defensiveLine > 65 ? 'High Press' : 'Deep Compact'} ({tactics.defensiveLine})</span>
+                <div className="flex justify-between text-xs font-sans">
+                  <span className="text-[#B0BACB]">Defensive Line</span>
+                  <span className="text-[#F48B56] font-bold">{tactics.defensiveLine === 50 ? 'Balanced' : tactics.defensiveLine > 65 ? 'High Press' : 'Deep Compact'} ({tactics.defensiveLine})</span>
                 </div>
                 <input 
                   type="range" min="10" max="90" step="5"
                   value={tactics.defensiveLine}
                   onChange={(e) => setTactics({ ...tactics, defensiveLine: parseInt(e.target.value) })}
-                  className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
+                  className="w-full accent-orange-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
                 />
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between text-xs font-mono">
+                <div className="flex justify-between text-xs font-sans">
                   <span className="text-slate-400">Build-Up Tempo</span>
-                  <span className="text-emerald-400 font-bold">{tactics.tempo === 50 ? 'Balanced' : tactics.tempo > 65 ? 'Direct/Fast' : 'Slow Possession'} ({tactics.tempo})</span>
+                  <span className="text-orange-400 font-bold">{tactics.tempo === 50 ? 'Balanced' : tactics.tempo > 65 ? 'Direct/Fast' : 'Slow Possession'} ({tactics.tempo})</span>
                 </div>
                 <input 
                   type="range" min="10" max="90" step="5"
                   value={tactics.tempo}
                   onChange={(e) => setTactics({ ...tactics, tempo: parseInt(e.target.value) })}
-                  className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
+                  className="w-full accent-orange-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
                 />
               </div>
 
               <div className="space-y-1">
-                <div className="flex justify-between text-xs font-mono">
+                <div className="flex justify-between text-xs font-sans">
                   <span className="text-slate-400">Pressing Intensity</span>
-                  <span className="text-emerald-400 font-bold">{tactics.pressingIntensity === 50 ? 'Balanced' : tactics.pressingIntensity > 65 ? 'Gegenpress' : 'Passive'} ({tactics.pressingIntensity})</span>
+                  <span className="text-orange-400 font-bold">{tactics.pressingIntensity === 50 ? 'Balanced' : tactics.pressingIntensity > 65 ? 'Gegenpress' : 'Passive'} ({tactics.pressingIntensity})</span>
                 </div>
                 <input 
                   type="range" min="10" max="90" step="5"
                   value={tactics.pressingIntensity}
                   onChange={(e) => setTactics({ ...tactics, pressingIntensity: parseInt(e.target.value) })}
-                  className="w-full accent-emerald-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
+                  className="w-full accent-orange-500 h-1 bg-slate-950 rounded-lg cursor-pointer"
                 />
               </div>
             </div>
@@ -964,14 +735,14 @@ export default function App() {
               <div className="pt-2 border-t border-slate-800/60 space-y-2">
                 <button
                   onClick={() => setCurrentView('simulation')}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shadow-emerald-500/10 cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shadow-orange-500/10 cursor-pointer flex items-center justify-center gap-2"
                   id="proceed-to-sim-btn"
                 >
                   <Star className="w-4 h-4 fill-current" />
                   Proceed to Simulation
                 </button>
                 {draftedPlayers.length < 11 && (
-                  <p className="text-[10px] text-amber-500 font-mono text-center leading-normal">
+                  <p className="text-xs text-amber-500 font-sans text-center leading-normal">
                     ⚠️ Roster incomplete ({draftedPlayers.length}/11). Reserve fill-ins will be used during simulation.
                   </p>
                 )}
@@ -1019,17 +790,17 @@ export default function App() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-2xl ${
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-lg ${
               alertMessage.type === 'error' 
                 ? 'bg-rose-950 border-rose-500/40 text-rose-200' 
-                : 'bg-emerald-950 border-emerald-500/40 text-emerald-200'
+                : 'bg-orange-950 border-orange-500/40 text-orange-200'
             }`}
-            id="system-toast-alert"
+            role="status" aria-live="polite" id="system-toast-alert"
           >
             {alertMessage.type === 'error' ? (
               <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-orange-400 flex-shrink-0" />
             )}
             <span className="text-xs font-semibold">{alertMessage.text}</span>
           </motion.div>

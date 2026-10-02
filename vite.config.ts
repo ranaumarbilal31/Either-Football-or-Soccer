@@ -5,6 +5,12 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
+    build: {
+      outDir: 'dist/client',
+      rollupOptions: {
+        output: { manualChunks: { react: ['react', 'react-dom'], motion: ['motion/react'] } },
+      },
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import ReportText from './ReportText';
 import { Player, Tactics, MatchResult, MatchEvent, PlayerMatchRating } from '../types';
 
-const APP_SECRET = 'football-app-secret-2024';
 import { 
   BarChart2, 
   HelpCircle, 
@@ -68,7 +68,7 @@ export default function DebriefRoom({
         // Parse coordinates from description if present, otherwise fall back to randomized distribution
         let x = 0;
         let y = 0;
-        const coordMatch = event.description.match(/from \((\d+\.?\d*),\s*(\d+\.?\d*)\)/);
+        const coordMatch = event.description.match(/(?:from|at) \((\d+\.?\d*),\s*(\d+\.?\d*)\)/);
         if (coordMatch) {
           x = parseFloat(coordMatch[1]);
           y = parseFloat(coordMatch[2]);
@@ -89,7 +89,7 @@ export default function DebriefRoom({
           y,
           minute: event.minute,
           player: event.player || (team === 'HOME' ? 'Home Player' : 'Opposition Winger'),
-          xG: event.xG || 0.12,
+          xG: event.xG ?? 0.12,
           isGoal,
           team,
           description: event.description,
@@ -101,15 +101,17 @@ export default function DebriefRoom({
 
   // Retrieve AI Coach Summary from backend on component mount
   useEffect(() => {
+    if (activeTab !== 'coach' || coachSummary) return;
+    let cancelled = false;
     const fetchCoachSummary = async () => {
       setLoadingCoach(true);
       setErrorCoach('');
       try {
         const res = await fetch('/api/coach-summary', {
           method: 'POST',
+          signal: AbortSignal.timeout(30000),
           headers: { 
-            'Content-Type': 'application/json',
-            'x-app-secret': APP_SECRET
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             matchResult,
@@ -123,17 +125,18 @@ export default function DebriefRoom({
         }
 
         const data = await res.json();
-        setCoachSummary(data.summary || 'Tactical analysis summary unavailable.');
+        if (!cancelled) setCoachSummary(data.summary || 'Tactical analysis summary unavailable.');
       } catch (err: any) {
         console.error('Error fetching coach summary:', err);
-        setErrorCoach('Could not contact tactical coaching server. Please check your connection.');
+        if (!cancelled) setErrorCoach('Could not contact tactical coaching server. Please check your connection.');
       } finally {
-        setLoadingCoach(false);
+        if (!cancelled) setLoadingCoach(false);
       }
     };
 
     fetchCoachSummary();
-  }, [matchResult, tactics, chemistry]);
+    return () => { cancelled = true; };
+  }, [matchResult, tactics, chemistry, activeTab]);
 
   const stats = matchResult.stats;
 
@@ -179,8 +182,8 @@ export default function DebriefRoom({
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full max-h-[220px]" id="momentum-svg-chart">
         <defs>
           <linearGradient id="homeMomentumGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3ECF8E" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#3ECF8E" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#F48B56" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#F48B56" stopOpacity="0.0" />
           </linearGradient>
           <linearGradient id="awayMomentumGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.0" />
@@ -196,32 +199,32 @@ export default function DebriefRoom({
         <path d={awayFillPath} fill="url(#awayMomentumGrad)" />
 
         {/* Core Line */}
-        <path d={linePath} fill="none" stroke="#8A8A93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="#A6B1C3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
         {/* Indicators */}
-        <text x={padding + 5} y={padding + 12} className="text-[10px] font-mono fill-[#3ECF8E] font-bold">▲ HOME DOMINANCE</text>
-        <text x={padding + 5} y={height - padding - 4} className="text-[10px] font-mono fill-blue-400 font-bold">▼ AWAY PRESSURE</text>
+        <text x={padding + 5} y={padding + 12} className="text-xs font-sans fill-[#F48B56] font-bold">▲ HOME DOMINANCE</text>
+        <text x={padding + 5} y={height - padding - 4} className="text-xs font-sans fill-blue-400 font-bold">▼ AWAY PRESSURE</text>
       </svg>
     );
   };
 
   return (
-    <div className="bg-[#131316] border border-white/[0.08] rounded-3xl p-6 shadow-2xl relative" id="debrief-room-container">
+    <div className="bg-[#142238] border border-white/[0.08] rounded-3xl p-6 shadow-lg relative" id="debrief-room-container">
       {/* Upper Scoreboard Row */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/[0.08] pb-5 mb-6 gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-[#3ECF8E]" />
-            <h2 className="text-xl font-black tracking-tight text-[#F2F2F0]">Tactical Debrief Room</h2>
+            <Award className="w-5 h-5 text-[#F48B56]" />
+            <h2 className="text-xl font-black tracking-tight text-[#F2EADB]">Tactical Debrief Room</h2>
           </div>
-          <p className="text-xs font-mono text-slate-500 mt-1">
-            Analyze match outcomes • Inspect SHAP explainable models • Review Coach summary
+          <p className="text-xs font-sans text-slate-400 mt-1">
+            Analyze match outcomes • Inspect rating contributions • Review Coach summary
           </p>
         </div>
 
         <button
           onClick={onReset}
-          className="py-2.5 px-5 bg-[#3ECF8E] hover:bg-[#3ECF8E]/90 text-[#0A0A0C] font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
+          className="py-2.5 px-5 bg-[#F48B56] hover:bg-[#F48B56]/90 text-[#0B1423] font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md cursor-pointer"
           id="back-to-hq-btn"
         >
           Reset and Start New Draft
@@ -229,37 +232,37 @@ export default function DebriefRoom({
       </div>
 
       {/* Global scoreboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 bg-[#0A0A0C]/80 border border-white/[0.08] rounded-2xl p-5 mb-6 items-center gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 bg-[#0B1423]/80 border border-white/[0.08] rounded-2xl p-5 mb-6 items-center gap-4">
         <div className="text-center md:text-left">
-          <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1">Squad Formation</span>
-          <span className="text-sm font-black text-slate-300 font-mono">{tactics.formation}</span>
+          <span className="text-xs font-sans uppercase text-slate-400 block mb-1">Squad Formation</span>
+          <span className="text-sm font-black text-slate-300 font-sans">{tactics.formation}</span>
         </div>
 
         <div className="flex justify-center items-center gap-4">
           <div className="text-right">
             <span className="text-sm font-bold text-slate-200">Home</span>
           </div>
-          <span className="text-4xl font-black font-mono text-[#3ECF8E]">{matchResult.homeScore}</span>
-          <span className="text-xl font-bold text-slate-600">-</span>
-          <span className="text-4xl font-black font-mono text-slate-100">{matchResult.awayScore}</span>
+          <span className="text-4xl font-black font-sans text-[#F48B56]">{matchResult.homeScore}</span>
+          <span className="text-xl font-bold text-slate-400">-</span>
+          <span className="text-4xl font-black font-sans text-slate-100">{matchResult.awayScore}</span>
           <div className="text-left">
             <span className="text-sm font-bold text-slate-300">{matchResult.awayTeamName}</span>
           </div>
         </div>
 
         <div className="text-center md:text-right">
-          <span className="text-[10px] font-mono uppercase text-slate-500 block mb-1">Match Date</span>
-          <span className="text-xs font-mono text-slate-400">{new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          <span className="text-xs font-sans uppercase text-slate-400 block mb-1">Match Date</span>
+          <span className="text-xs font-sans text-slate-400">{new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
       </div>
 
       {/* Navigation tabs */}
-      <div className="flex gap-1 bg-[#0A0A0C] p-1 rounded-xl border border-white/[0.08] mb-6 overflow-x-auto scrollbar-thin">
+      <div className="flex gap-1 bg-[#0B1423] p-1 rounded-xl border border-white/[0.08] mb-6 overflow-x-auto scrollbar-thin">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`flex-1 py-2 px-4 rounded-lg text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-4 rounded-lg text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'overview'
-              ? 'bg-[#3ECF8E] text-[#0A0A0C]'
+              ? 'bg-[#F48B56] text-[#0B1423]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
           }`}
           id="tab-overview"
@@ -270,9 +273,9 @@ export default function DebriefRoom({
 
         <button
           onClick={() => setActiveTab('shots')}
-          className={`flex-1 py-2 px-4 rounded-lg text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-4 rounded-lg text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'shots'
-              ? 'bg-[#3ECF8E] text-[#0A0A0C]'
+              ? 'bg-[#F48B56] text-[#0B1423]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
           }`}
           id="tab-shots"
@@ -283,22 +286,22 @@ export default function DebriefRoom({
 
         <button
           onClick={() => setActiveTab('shap')}
-          className={`flex-1 py-2 px-4 rounded-lg text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-4 rounded-lg text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'shap'
-              ? 'bg-[#3ECF8E] text-[#0A0A0C]'
+              ? 'bg-[#F48B56] text-[#0B1423]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
           }`}
           id="tab-shap"
         >
           <Zap className="w-4 h-4" />
-          XAI SHAP Ratings
+          Player Ratings
         </button>
 
         <button
           onClick={() => setActiveTab('coach')}
-          className={`flex-1 py-2 px-4 rounded-lg text-xs font-mono font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2 px-4 rounded-lg text-xs font-sans font-bold transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2 ${
             activeTab === 'coach'
-              ? 'bg-[#3ECF8E] text-[#0A0A0C]'
+              ? 'bg-[#F48B56] text-[#0B1423]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
           }`}
           id="tab-coach"
@@ -321,85 +324,85 @@ export default function DebriefRoom({
             {/* Split Stats list */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Core metrics comparison */}
-              <div className="bg-[#0A0A0C] border border-white/[0.08] rounded-2xl p-5 space-y-4">
-                <h3 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-2">
+              <div className="bg-[#0B1423] border border-white/[0.08] rounded-2xl p-5 space-y-4">
+                <h3 className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-2">
                   Match Aggregates Comparison
                 </h3>
 
                 {/* Possession */}
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-[#3ECF8E] font-bold">{stats.possession}%</span>
+                  <div className="flex justify-between font-sans">
+                    <span className="text-[#F48B56] font-bold">{stats.possession}%</span>
                     <span className="text-slate-400">Possession</span>
                     <span className="text-slate-400">{100 - stats.possession}%</span>
                   </div>
-                  <div className="w-full bg-[#131316] h-2 rounded-full overflow-hidden flex">
-                    <div className="bg-[#3ECF8E] h-full" style={{ width: `${stats.possession}%` }} />
+                  <div className="w-full bg-[#142238] h-2 rounded-full overflow-hidden flex">
+                    <div className="bg-[#F48B56] h-full" style={{ width: `${stats.possession}%` }} />
                     <div className="bg-blue-500 h-full" style={{ width: `${100 - stats.possession}%` }} />
                   </div>
                 </div>
 
                 {/* Shots */}
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-[#3ECF8E] font-bold">{stats.shots.home}</span>
+                  <div className="flex justify-between font-sans">
+                    <span className="text-[#F48B56] font-bold">{stats.shots.home}</span>
                     <span className="text-slate-400">Total Shots</span>
                     <span className="text-slate-300 font-bold">{stats.shots.away}</span>
                   </div>
-                  <div className="w-full bg-[#131316] h-2 rounded-full overflow-hidden flex">
-                    <div className="bg-[#3ECF8E] h-full" style={{ width: `${(stats.shots.home / Math.max(1, stats.shots.home + stats.shots.away)) * 100}%` }} />
+                  <div className="w-full bg-[#142238] h-2 rounded-full overflow-hidden flex">
+                    <div className="bg-[#F48B56] h-full" style={{ width: `${(stats.shots.home / Math.max(1, stats.shots.home + stats.shots.away)) * 100}%` }} />
                     <div className="bg-blue-500 h-full" style={{ width: `${(stats.shots.away / Math.max(1, stats.shots.home + stats.shots.away)) * 100}%` }} />
                   </div>
                 </div>
 
                 {/* Shots on Target */}
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-[#3ECF8E] font-bold">{stats.shotsOnTarget.home}</span>
+                  <div className="flex justify-between font-sans">
+                    <span className="text-[#F48B56] font-bold">{stats.shotsOnTarget.home}</span>
                     <span className="text-slate-400">Shots on Target</span>
                     <span className="text-slate-300 font-bold">{stats.shotsOnTarget.away}</span>
                   </div>
-                  <div className="w-full bg-[#131316] h-2 rounded-full overflow-hidden flex">
-                    <div className="bg-[#3ECF8E] h-full" style={{ width: `${(stats.shotsOnTarget.home / Math.max(1, stats.shotsOnTarget.home + stats.shotsOnTarget.away)) * 100}%` }} />
+                  <div className="w-full bg-[#142238] h-2 rounded-full overflow-hidden flex">
+                    <div className="bg-[#F48B56] h-full" style={{ width: `${(stats.shotsOnTarget.home / Math.max(1, stats.shotsOnTarget.home + stats.shotsOnTarget.away)) * 100}%` }} />
                     <div className="bg-blue-500 h-full" style={{ width: `${(stats.shotsOnTarget.away / Math.max(1, stats.shotsOnTarget.home + stats.shotsOnTarget.away)) * 100}%` }} />
                   </div>
                 </div>
 
                 {/* Expected Goals */}
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-[#3ECF8E] font-bold">{stats.xG.home.toFixed(2)}</span>
+                  <div className="flex justify-between font-sans">
+                    <span className="text-[#F48B56] font-bold">{stats.xG.home.toFixed(2)}</span>
                     <span className="text-slate-400">Expected Goals (xG)</span>
                     <span className="text-slate-300 font-bold">{stats.xG.away.toFixed(2)}</span>
                   </div>
-                  <div className="w-full bg-[#131316] h-2 rounded-full overflow-hidden flex">
-                    <div className="bg-[#3ECF8E] h-full" style={{ width: `${(stats.xG.home / Math.max(0.1, stats.xG.home + stats.xG.away)) * 100}%` }} />
+                  <div className="w-full bg-[#142238] h-2 rounded-full overflow-hidden flex">
+                    <div className="bg-[#F48B56] h-full" style={{ width: `${(stats.xG.home / Math.max(0.1, stats.xG.home + stats.xG.away)) * 100}%` }} />
                     <div className="bg-blue-500 h-full" style={{ width: `${(stats.xG.away / Math.max(0.1, stats.xG.home + stats.xG.away)) * 100}%` }} />
                   </div>
                 </div>
 
                 {/* Passing Accuracy */}
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between font-mono">
-                    <span className="text-[#3ECF8E] font-bold">{stats.passAccuracy.home}%</span>
+                  <div className="flex justify-between font-sans">
+                    <span className="text-[#F48B56] font-bold">{stats.passAccuracy.home}%</span>
                     <span className="text-slate-400">Pass Accuracy %</span>
                     <span className="text-slate-300 font-bold">{stats.passAccuracy.away}%</span>
                   </div>
-                  <div className="w-full bg-[#131316] h-2 rounded-full overflow-hidden flex">
-                    <div className="bg-[#3ECF8E] h-full" style={{ width: `${stats.passAccuracy.home}%` }} />
+                  <div className="w-full bg-[#142238] h-2 rounded-full overflow-hidden flex">
+                    <div className="bg-[#F48B56] h-full" style={{ width: `${stats.passAccuracy.home}%` }} />
                     <div className="bg-blue-500 h-full" style={{ width: `${stats.passAccuracy.away}%` }} />
                   </div>
                 </div>
               </div>
 
               {/* Momentum Over Time */}
-              <div className="bg-[#0A0A0C] border border-white/[0.08] rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-[#0B1423] border border-white/[0.08] rounded-2xl p-5 flex flex-col justify-between">
                 <div>
-                  <h3 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-2 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-[#3ECF8E]" />
+                  <h3 className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-2 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-[#F48B56]" />
                     90-Min Match Momentum
                   </h3>
-                  <p className="text-[11px] text-slate-500 font-mono mt-1.5 leading-relaxed">
+                  <p className="text-xs text-slate-400 font-sans mt-1.5 leading-relaxed">
                     Visualizes minute-by-minute tactical domination based on quality differential, sliders, and luck.
                   </p>
                 </div>
@@ -420,13 +423,13 @@ export default function DebriefRoom({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-5"
           >
-            <div className="bg-[#0A0A0C] border border-white/[0.08] rounded-2xl p-4 flex flex-col lg:flex-row gap-6">
+            <div className="bg-[#0B1423] border border-white/[0.08] rounded-2xl p-4 flex flex-col lg:flex-row gap-6">
               {/* Visual 2D Pitch Shot Plotter */}
-              <div className="flex-1 bg-[#131316]/50 border border-white/[0.08] rounded-xl overflow-hidden relative min-h-[255px] lg:min-h-[323px] lg:max-w-[480px]">
+              <div className="flex-1 bg-[#142238]/50 border border-white/[0.08] rounded-xl overflow-hidden relative min-h-[255px] lg:min-h-[323px] lg:max-w-[480px]">
                 {/* SVG Pitch Canvas */}
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full min-h-[255px]" id="shot-map-pitch">
                   {/* Pitch outline green lines */}
-                  <rect x="0" y="0" width="100" height="100" fill="#0A0A0C" />
+                  <rect x="0" y="0" width="100" height="100" fill="#0B1423" />
                   
                   {/* Boundary lines */}
                   <rect x="2" y="2" width="96" height="96" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
@@ -452,7 +455,7 @@ export default function DebriefRoom({
                       cx={shot.x}
                       cy={shot.y}
                       r={Math.max(1.8, Math.min(3.5, shot.xG * 6))} // size proportional to xG
-                      fill={shot.isGoal ? '#3ECF8E' : shot.team === 'HOME' ? '#fbbf24' : '#ef4444'}
+                      fill={shot.isGoal ? '#F48B56' : shot.team === 'HOME' ? '#fbbf24' : '#ef4444'}
                       className="cursor-pointer transition-all hover:scale-150 stroke-slate-950 stroke-1"
                       style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                       onMouseEnter={() => setHoveredShot(shot)}
@@ -462,9 +465,9 @@ export default function DebriefRoom({
                 </svg>
 
                 {/* Key Indicators */}
-                <div className="absolute top-3 left-3 bg-[#0A0A0C]/90 border border-white/[0.08] p-2.5 rounded-lg text-[10px] font-mono space-y-1">
+                <div className="absolute top-3 left-3 bg-[#0B1423]/90 border border-white/[0.08] p-2.5 rounded-lg text-xs font-sans space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#3ECF8E]" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#F48B56]" />
                     <span className="text-slate-300">Goal Scored</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -484,19 +487,19 @@ export default function DebriefRoom({
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      className="absolute bottom-3 right-3 bg-[#0A0A0C] border border-white/[0.08] rounded-xl p-3 max-w-[280px] shadow-2xl text-xs space-y-1.5"
+                      className="absolute bottom-3 right-3 bg-[#0B1423] border border-white/[0.08] rounded-xl p-3 max-w-[280px] shadow-lg text-xs space-y-1.5"
                     >
-                      <div className="flex justify-between items-center font-mono">
-                        <span className="font-bold text-[#3ECF8E]">{hoveredShot.minute}'</span>
-                        <span className={`text-[10px] uppercase px-1.5 py-0.2 rounded font-bold ${
-                          hoveredShot.isGoal ? 'bg-[#3ECF8E]/20 text-[#3ECF8E]' : 'bg-white/[0.05] text-slate-400'
+                      <div className="flex justify-between items-center font-sans">
+                        <span className="font-bold text-[#F48B56]">{hoveredShot.minute}'</span>
+                        <span className={`text-xs uppercase px-1.5 py-0.2 rounded font-bold ${
+                          hoveredShot.isGoal ? 'bg-[#F48B56]/20 text-[#F48B56]' : 'bg-white/[0.05] text-slate-400'
                         }`}>
                           {hoveredShot.isGoal ? 'Goal' : 'Shot'}
                         </span>
                       </div>
                       <p className="font-bold text-slate-100 truncate">{hoveredShot.player}</p>
-                      <p className="text-[11px] text-slate-400 leading-normal">{hoveredShot.description}</p>
-                      <div className="text-[10px] font-mono text-slate-500 border-t border-white/[0.08] pt-1">
+                      <p className="text-xs text-slate-400 leading-normal">{hoveredShot.description}</p>
+                      <div className="text-xs font-sans text-slate-400 border-t border-white/[0.08] pt-1">
                         Expected Goals xG: <span className="text-slate-300 font-bold">{hoveredShot.xG.toFixed(2)}</span>
                       </div>
                     </motion.div>
@@ -507,23 +510,23 @@ export default function DebriefRoom({
               {/* Side Shot summary List */}
               <div className="w-full lg:w-[280px] space-y-3 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-1.5 mb-2.5">
+                  <h4 className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest border-b border-white/[0.08] pb-1.5 mb-2.5">
                     Shot Map Analytics
                   </h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-normal">
+                  <p className="text-xs text-slate-400 leading-relaxed font-normal">
                     This interactive 2D diagram plots every shot location based on match momentum and slider configurations. Size indicates shooting xG weight. Hover on circles to review.
                   </p>
                 </div>
 
                 <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                   {plottedShots.map((shot, idx) => (
-                    <div key={idx} className="bg-[#131316]/60 border border-white/[0.08] p-2.5 rounded-lg flex justify-between items-center text-xs">
+                    <div key={idx} className="bg-[#142238]/60 border border-white/[0.08] p-2.5 rounded-lg flex justify-between items-center text-xs">
                       <div className="flex items-center gap-1.5 truncate">
-                        <span className="font-mono text-slate-500">{shot.minute}'</span>
+                        <span className="font-sans text-slate-400">{shot.minute}'</span>
                         <span className="text-slate-300 truncate font-semibold">{shot.player}</span>
                       </div>
-                      <span className={`font-mono text-[10px] font-bold px-1.5 py-0.2 rounded flex-shrink-0 ${
-                        shot.isGoal ? 'bg-[#3ECF8E]/20 text-[#3ECF8E]' : 'text-slate-500'
+                      <span className={`font-sans text-xs font-bold px-1.5 py-0.2 rounded flex-shrink-0 ${
+                        shot.isGoal ? 'bg-[#F48B56]/20 text-[#F48B56]' : 'text-slate-400'
                       }`}>
                         xG {shot.xG.toFixed(2)}
                       </span>
@@ -543,15 +546,15 @@ export default function DebriefRoom({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            <div className="bg-[#0A0A0C] border border-white/[0.08] rounded-2xl p-4">
+            <div className="bg-[#0B1423] border border-white/[0.08] rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-4 h-4 text-[#3ECF8E] animate-pulse" />
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest">
-                  Explainable AI (XAI) SHAP Ratings
+                <Activity className="w-4 h-4 text-[#F48B56] " />
+                <span className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest">
+                  Player Rating Breakdown
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 leading-normal font-normal max-w-2xl mb-4">
-                This dashboard uses game theory Shapley values to explain how each player's final performance rating was derived from baseline tactics, physical stamina levels, and match statistics.
+              <p className="text-xs text-slate-400 leading-normal font-normal max-w-2xl mb-4">
+                These heuristic contributions show how tactics, stamina, positioning, and simulated statistics affect each rating. Contributions start from 6.0; the final rating is capped between 3.5 and 10.0.
               </p>
 
               {/* Player list layout with expandable SHAP charts */}
@@ -565,7 +568,7 @@ export default function DebriefRoom({
                   return (
                     <div 
                       key={p.id}
-                      className="bg-[#131316] border border-white/[0.08] hover:border-white/[0.15] rounded-xl overflow-hidden transition-colors"
+                      className="bg-[#142238] border border-white/[0.08] hover:border-white/[0.15] rounded-xl overflow-hidden transition-colors"
                     >
                       <button
                         onClick={() => setSelectedRatingPlayer(isOpen ? null : rating.playerId)}
@@ -573,7 +576,7 @@ export default function DebriefRoom({
                         id={`shap-expand-${p.id}`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`py-1 px-2 text-[10px] font-mono font-bold rounded ${
+                          <span className={`py-1 px-2 text-xs font-sans font-bold rounded ${
                             p.position === 'FWD' ? 'bg-rose-500/10 text-rose-400' :
                             p.position === 'MID' ? 'bg-amber-500/10 text-amber-400' :
                             p.position === 'DEF' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'
@@ -582,18 +585,18 @@ export default function DebriefRoom({
                           </span>
                           <div>
                             <span className="text-xs font-bold text-slate-200 block">{p.name}</span>
-                            <span className="text-[10px] font-mono text-slate-500">{p.club}</span>
+                            <span className="text-xs font-sans text-slate-400">{p.club}</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-4">
-                          <div className="text-right flex items-center gap-1.5 font-mono">
-                            <span className="text-[10px] text-slate-500 uppercase">Match Rating:</span>
-                            <span className="text-xs font-black text-[#3ECF8E] bg-[#3ECF8E]/15 border border-[#3ECF8E]/30 px-2 py-0.5 rounded">
+                          <div className="text-right flex items-center gap-1.5 font-sans">
+                            <span className="text-xs text-slate-400 uppercase">Match Rating:</span>
+                            <span className="text-xs font-black text-[#F48B56] bg-[#F48B56]/15 border border-[#F48B56]/30 px-2 py-0.5 rounded">
                               {rating.rating}
                             </span>
                           </div>
-                          {isOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                          {isOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                         </div>
                       </button>
 
@@ -603,33 +606,33 @@ export default function DebriefRoom({
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="px-4 pb-4 border-t border-[#0A0A0C] bg-[#0A0A0C]/40"
+                            className="px-4 pb-4 border-t border-[#0B1423] bg-[#0B1423]/40"
                           >
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3.5">
                               {/* Match Stats breakdown */}
-                              <div className="bg-[#0A0A0C]/60 border border-white/[0.04] rounded-xl p-3 space-y-2">
-                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-1">
+                              <div className="bg-[#0B1423]/60 border border-white/[0.04] rounded-xl p-3 space-y-2">
+                                <span className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest block mb-1">
                                   Performance stats
                                 </span>
-                                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div className="grid grid-cols-2 gap-2 text-xs font-sans">
                                   <div className="flex justify-between border-b border-white/[0.04] pb-1">
-                                    <span className="text-slate-500">Goals:</span>
+                                    <span className="text-slate-400">Goals:</span>
                                     <span className="text-slate-300 font-bold">{rating.goals}</span>
                                   </div>
                                   <div className="flex justify-between border-b border-white/[0.04] pb-1">
-                                    <span className="text-slate-500">Assists:</span>
+                                    <span className="text-slate-400">Assists:</span>
                                     <span className="text-slate-300 font-bold">{rating.assists}</span>
                                   </div>
                                   <div className="flex justify-between border-b border-white/[0.04] pb-1">
-                                    <span className="text-slate-500">Shots:</span>
+                                    <span className="text-slate-400">Shots:</span>
                                     <span className="text-slate-300 font-bold">{rating.shots}</span>
                                   </div>
                                   <div className="flex justify-between border-b border-white/[0.04] pb-1">
-                                    <span className="text-slate-500">Tackles:</span>
+                                    <span className="text-slate-400">Tackles:</span>
                                     <span className="text-slate-300 font-bold">{rating.tackles}</span>
                                   </div>
                                   <div className="flex justify-between col-span-2">
-                                    <span className="text-slate-500">Passing Accuracy:</span>
+                                    <span className="text-slate-400">Passing Accuracy:</span>
                                     <span className="text-slate-300 font-bold">
                                       {rating.passesCompleted}/{rating.passesAttempted} ({rating.passesAttempted > 0 ? Math.round((rating.passesCompleted / rating.passesAttempted) * 100) : 0}%)
                                     </span>
@@ -638,23 +641,23 @@ export default function DebriefRoom({
                               </div>
 
                               {/* SHAP Game Theory Charts */}
-                              <div className="bg-[#0A0A0C]/60 border border-white/[0.04] rounded-xl p-3 space-y-2">
-                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-2">
-                                  SHAP Value Contributions (Baseline 6.0)
+                              <div className="bg-[#0B1423]/60 border border-white/[0.04] rounded-xl p-3 space-y-2">
+                                <span className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                                  Rating Contributions (Baseline 6.0)
                                 </span>
                                 
-                                <div className="space-y-2 text-[10px] font-mono">
+                                <div className="space-y-2 text-xs font-sans">
                                   {/* Attacking */}
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-slate-400">
                                       <span>Attacking (xG/Goals/Assists)</span>
-                                      <span className={rating.shapValues.attacking >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}>
+                                      <span className={rating.shapValues.attacking >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}>
                                         {rating.shapValues.attacking >= 0 ? '+' : ''}{rating.shapValues.attacking.toFixed(2)}
                                       </span>
                                     </div>
-                                    <div className="w-full bg-[#131316] h-1.5 rounded-full overflow-hidden flex">
+                                    <div className="w-full bg-[#142238] h-1.5 rounded-full overflow-hidden flex">
                                       <div 
-                                        className={rating.shapValues.attacking >= 0 ? 'bg-[#3ECF8E]' : 'bg-rose-500'}
+                                        className={rating.shapValues.attacking >= 0 ? 'bg-[#F48B56]' : 'bg-rose-500'}
                                         style={{ width: `${Math.min(100, Math.abs(rating.shapValues.attacking) * 40)}%` }}
                                       />
                                     </div>
@@ -664,13 +667,13 @@ export default function DebriefRoom({
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-slate-400">
                                       <span>Defending Contributions</span>
-                                      <span className={rating.shapValues.defending >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}>
+                                      <span className={rating.shapValues.defending >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}>
                                         {rating.shapValues.defending >= 0 ? '+' : ''}{rating.shapValues.defending.toFixed(2)}
                                       </span>
                                     </div>
-                                    <div className="w-full bg-[#131316] h-1.5 rounded-full overflow-hidden flex">
+                                    <div className="w-full bg-[#142238] h-1.5 rounded-full overflow-hidden flex">
                                       <div 
-                                        className={rating.shapValues.defending >= 0 ? 'bg-[#3ECF8E]' : 'bg-rose-500'}
+                                        className={rating.shapValues.defending >= 0 ? 'bg-[#F48B56]' : 'bg-rose-500'}
                                         style={{ width: `${Math.min(100, Math.abs(rating.shapValues.defending) * 40)}%` }}
                                       />
                                     </div>
@@ -680,13 +683,13 @@ export default function DebriefRoom({
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-slate-400">
                                       <span>Passing & Connection</span>
-                                      <span className={rating.shapValues.passing >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}>
+                                      <span className={rating.shapValues.passing >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}>
                                         {rating.shapValues.passing >= 0 ? '+' : ''}{rating.shapValues.passing.toFixed(2)}
                                       </span>
                                     </div>
-                                    <div className="w-full bg-[#131316] h-1.5 rounded-full overflow-hidden flex">
+                                    <div className="w-full bg-[#142238] h-1.5 rounded-full overflow-hidden flex">
                                       <div 
-                                        className={rating.shapValues.passing >= 0 ? 'bg-[#3ECF8E]' : 'bg-rose-500'}
+                                        className={rating.shapValues.passing >= 0 ? 'bg-[#F48B56]' : 'bg-rose-500'}
                                         style={{ width: `${Math.min(100, Math.abs(rating.shapValues.passing) * 40)}%` }}
                                       />
                                     </div>
@@ -696,13 +699,13 @@ export default function DebriefRoom({
                                   <div className="space-y-0.5">
                                     <div className="flex justify-between text-slate-400">
                                       <span>Stamina Remaining</span>
-                                      <span className={rating.shapValues.stamina >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}>
+                                      <span className={rating.shapValues.stamina >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}>
                                         {rating.shapValues.stamina >= 0 ? '+' : ''}{rating.shapValues.stamina.toFixed(2)}
                                       </span>
                                     </div>
-                                    <div className="w-full bg-[#131316] h-1.5 rounded-full overflow-hidden flex">
+                                    <div className="w-full bg-[#142238] h-1.5 rounded-full overflow-hidden flex">
                                       <div 
-                                        className={rating.shapValues.stamina >= 0 ? 'bg-[#3ECF8E]' : 'bg-rose-500'}
+                                        className={rating.shapValues.stamina >= 0 ? 'bg-[#F48B56]' : 'bg-rose-500'}
                                         style={{ width: `${Math.min(100, Math.abs(rating.shapValues.stamina) * 40)}%` }}
                                       />
                                     </div>
@@ -713,13 +716,13 @@ export default function DebriefRoom({
                                     <div className="space-y-0.5">
                                       <div className="flex justify-between text-slate-400">
                                         <span>Tactical Role Fit (Positional)</span>
-                                        <span className={rating.shapValues.positional >= 0 ? 'text-[#3ECF8E]' : 'text-rose-400'}>
+                                        <span className={rating.shapValues.positional >= 0 ? 'text-[#F48B56]' : 'text-rose-400'}>
                                           {rating.shapValues.positional >= 0 ? '+' : ''}{rating.shapValues.positional.toFixed(2)}
                                         </span>
                                       </div>
-                                      <div className="w-full bg-[#131316] h-1.5 rounded-full overflow-hidden flex">
+                                      <div className="w-full bg-[#142238] h-1.5 rounded-full overflow-hidden flex">
                                         <div 
-                                          className={rating.shapValues.positional >= 0 ? 'bg-[#3ECF8E]' : 'bg-rose-500'}
+                                          className={rating.shapValues.positional >= 0 ? 'bg-[#F48B56]' : 'bg-rose-500'}
                                           style={{ width: `${Math.min(100, Math.abs(rating.shapValues.positional) * 40)}%` }}
                                         />
                                       </div>
@@ -747,46 +750,31 @@ export default function DebriefRoom({
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            <div className="bg-[#0A0A0C] border border-white/[0.08] rounded-2xl p-5 min-h-[300px] flex flex-col justify-between">
+            <div className="bg-[#0B1423] border border-white/[0.08] rounded-2xl p-5 min-h-[300px] flex flex-col justify-between">
               {loadingCoach ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-12">
-                  <RefreshCw className="w-8 h-8 text-[#3ECF8E] animate-spin mb-4" />
-                  <p className="text-xs font-mono text-slate-400 animate-pulse">
+                  <RefreshCw className="w-8 h-8 text-[#F48B56] animate-spin mb-4" />
+                  <p className="text-xs font-sans text-slate-400 ">
                     AI Coach is analyzing match timeline and tactical statistics...
                   </p>
                 </div>
               ) : errorCoach ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-3">
                   <AlertCircle className="w-8 h-8 text-rose-500" />
-                  <p className="text-sm font-mono text-slate-400">{errorCoach}</p>
+                  <p className="text-sm font-sans text-slate-400">{errorCoach}</p>
                 </div>
               ) : (
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3">
-                    <Star className="w-5 h-5 text-[#3ECF8E]" />
-                    <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest">
+                    <Star className="w-5 h-5 text-[#F48B56]" />
+                    <span className="text-xs font-sans font-bold text-slate-400 uppercase tracking-widest">
                       AI Coach Tactical Analysis summary
                     </span>
                   </div>
 
                   {/* Render the summary text beautifully with robust styles */}
                   <div className="text-xs text-slate-300 space-y-4 leading-relaxed font-sans overflow-y-auto max-h-[480px] pr-1">
-                    {coachSummary.split('\n').map((line, idx) => {
-                      if (line.startsWith('### ')) {
-                        return <h3 key={idx} className="text-sm font-bold text-slate-100 font-sans tracking-tight pt-2">{line.replace('### ', '')}</h3>;
-                      }
-                      if (line.startsWith('#### ')) {
-                        return <h4 key={idx} className="text-xs font-bold text-[#3ECF8E] font-mono tracking-wider pt-2">{line.replace('#### ', '')}</h4>;
-                      }
-                      if (line.startsWith('* ')) {
-                        return <div key={idx} className="pl-4 py-0.5 text-slate-300 font-sans flex items-start gap-1.5">
-                          <span className="text-[#3ECF8E]">•</span>
-                          <span>{line.replace('* ', '')}</span>
-                        </div>;
-                      }
-                      if (line.trim() === '') return <div key={idx} className="h-2" />;
-                      return <p key={idx}>{line}</p>;
-                    })}
+                    <ReportText text={coachSummary} />
                   </div>
                 </div>
               )}
