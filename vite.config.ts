@@ -1,24 +1,17 @@
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-import { defineConfig } from 'vite';
-
-export default defineConfig(() => {
-  return {
-    build: {
-      outDir: 'dist/client',
-      rollupOptions: {
-        output: { manualChunks: { react: ['react', 'react-dom'], motion: ['motion/react'] } },
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: "dist/client",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          query: ["@tanstack/react-query"],
+        },
       },
     },
-    plugins: [react(), tailwindcss()],
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
-    },
-    server: {
-      hmr: true,
-    },
-  };
+  },
+  server: { hmr: true },
 });

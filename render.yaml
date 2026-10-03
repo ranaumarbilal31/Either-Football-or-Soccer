@@ -7,10 +7,10 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: 22.16.0
+        value: "22"
       - key: NODE_ENV
         value: production
       - key: TRUST_PROXY
         value: "1"
-      - key: AI_DAILY_REQUEST_LIMIT
-        value: "200"
+      - key: PLAYER_PROVIDER
+        value: sportsdb
