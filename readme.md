@@ -4,7 +4,7 @@ A free football squad sandbox. Discover real player profiles, build an XI within
 
 ## Run
 
-Node 22.12 or newer is required.
+Node 22.12 or newer within the Node 22 release line is required. Render and CI use Node 22.
 
 ```sh
 npm ci

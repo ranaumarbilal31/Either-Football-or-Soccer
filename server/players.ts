@@ -133,8 +133,8 @@ export function roleFrom(value: unknown): Role | null {
   if (typeof value !== "string") return null;
   const s = value.toLowerCase();
   if (/goal|keeper|^gk$/.test(s)) return "GK";
-  if (/def|back|^cb$|^lb$|^rb$/.test(s)) return "DEF";
   if (/mid|^cm$|^dm$|^am$/.test(s)) return "MID";
+  if (/def|back|^cb$|^lb$|^rb$/.test(s)) return "DEF";
   if (/forward|striker|wing|attack|^fwd$|^fw$/.test(s)) return "FWD";
   return null;
 }
@@ -196,9 +196,7 @@ function fetchedAt(value: unknown) {
 async function sports(endpoint: string) {
   return sportsCache.get(endpoint, sportsBase + endpoint);
 }
-export async function discover(
-  query: string,
-): Promise<{
+export async function discover(query: string): Promise<{
   players: Player[];
   stale: boolean;
   source: string;

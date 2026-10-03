@@ -17,6 +17,9 @@ test("provider identities survive mapping; staff, unknown positions and unsafe i
   assert.equal(p.image, null);
   assert.equal(p.role, "DEF");
   assert.equal(roleFrom("unknown"), null);
+  assert.equal(roleFrom("Defensive Midfield"), "MID");
+  assert.equal(roleFrom("Attacking Midfield"), "MID");
+  assert.equal(roleFrom("Right-Back"), "DEF");
   assert.equal(
     normalizeSports(
       { ...raw, strPosition: "Assistant Coach" },

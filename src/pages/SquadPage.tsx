@@ -39,7 +39,12 @@ export default function SquadPage() {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const pick = (i: number) => navigate(`/players?slot=${i}&role=${roles[i]}`);
-  const rows = ["FWD", "MID", "DEF", "GK"];
+  const rows =
+    squad.formation === "4-2-3-1"
+      ? [[10], [7, 8, 9], [5, 6], [1, 2, 3, 4], [0]]
+      : ["FWD", "MID", "DEF", "GK"].map((role) =>
+          roles.flatMap((r, i) => (r === role ? [i] : [])),
+        );
   return (
     <>
       <PageHeading
@@ -124,10 +129,10 @@ export default function SquadPage() {
                 <div className="penalty top" />
                 <div className="penalty bottom" />
               </div>
-              {rows.map((role) => (
-                <div className={`pitch-row row-${role}`} key={role}>
+              {rows.map((row, rowIndex) => (
+                <div className="pitch-row" key={rowIndex}>
                   {roles.map((r, i) => {
-                    if (r !== role) return null;
+                    if (!row.includes(i)) return null;
                     const member = squad.members.find(
                       (m) => m.slot === slotId(i),
                     );
