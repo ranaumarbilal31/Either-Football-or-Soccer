@@ -1,45 +1,171 @@
-# EFOS — build your club, then play
+<p align="center">
+  <img src="public/logo.webp" alt="EFOS crest" width="96" />
+</p>
 
-A rebuilt football management and simulation app with a clean setup flow, a pitch-first squad builder, and no sidebar or decorative numbering.
+<h1 align="center">Either Football or Soccer</h1>
 
-## Local preview
+<p align="center">Build your club. Find your chemistry. Take control on matchday.</p>
 
-Use Node 22.13 or newer. Run `npm ci`, configure `.env` from `.env.example`, then `npm run build` and `npm start`. Open http://127.0.0.1:3000. Use `npm run dev` for development. Original CSVs and existing provider snapshots remain in the ignored `data/` directory.
+EFOS is a football squad builder and management simulation with real player data, a points-based transfer budget, and an interactive touchline. Pick your eleven, connect the right players, and test your approach against real clubs or national teams.
 
-`data/` and `.env` are ignored by Git. Keep the original provider script and private key there; the app reads saved responses and never executes that script. FOOTBALL_DATA_KEY is used only on the server. Do not push or deploy without explicit user approval.
+The frontend uses **plain HTML, CSS, and JavaScript**, with locally bundled Monoton headings and a responsive pitch-and-player workspace. Match outcomes come from a seeded game engine; optional Gemini analysis explains the result afterward.
 
-## Club and squad
+## What you can do
 
-Get started opens setup. Skip starts an empty club at 100 points; Auto-select creates a legal eleven within budget. Easy provides 120 points, Medium 100, Hard 85, Very Hard 70; custom budgets range from 55–200. Difficulty changes purchasing power only.
+- **Create your club:** choose a team name, manager, difficulty, and budget, or skip setup and start with an empty pitch.
+- **Build an eleven:** search players, filter the database, assign players by click or drag-and-drop, and choose from five formations. Goalkeepers stay locked to goal.
+- **Find chemistry:** see neighboring connections colored by shared club, league, nationality, and positional fit.
+- **Manage the match:** pause, adjust tempo and pressing, change your defensive line or formation, and issue instructions at halftime.
+- **Play a season:** join a supported domestic league as an extra club and face every opponent home and away.
+- **Review performances:** inspect event-derived statistics, both teams' player grades, match reports, and season rankings.
+- **Keep your progress:** save locally in your browser, export your game, and preserve previous-version saves in an archive.
 
-Desktop keeps pitch and players together; mobile uses Pitch/Players views. The saved list contains 15 players per position group. Search covers the full catalog. Goalkeepers are locked to goal. Shared clubs, leagues, nationality and positional fit determine chemistry links. Complete your eleven before choosing a real club or international opponent.
+## Run locally
 
-A league adds Your FC as an extra club, schedules every opponent home and away, includes fair byes, and freezes its catalog and prices for the season. Every fixture uses the same symmetric, seeded game engine. Both teams receive match grades and season rankings.
+**Requirements:** Node.js **22.13 or newer** and npm. Player CSVs and provider snapshots are local inputs; they are not included in this repository.
 
-## Ratings and real data
+```sh
+git clone https://github.com/ranaumarbilal31/Either-Football-or-Soccer.git
+cd Either-Football-or-Soccer
+npm ci
+```
 
-Ability and simulated performance are separate ratings out of 10. Season ability uses position-specific category weights and percentiles within the same position/competition, with sample shrinkage `minutes / (minutes + 900)`. Up to 25% comes from verified individual last-five appearance grades, weighted newest first. Missing data is not treated as zero. Price is `roundToHalf(clamp(3 + 0.22 * (rating - 3)^2, 3, 15))` points.
+Copy `.env.example` to `.env`, then configure the integrations you want to use. On Windows PowerShell:
 
-The selectable player database imports `players_data-2026_2027.csv` and `players_data_light-2026_2027.csv` into local SQLite at `data/players.sqlite`. Matching full/light rows merge without duplicating players; missing evidence stays missing. Position-specific season statistics drive the ratings. Football-data.org and FPL retain real opponent coverage and result-derived club strength. Cross-provider identity links require a unique normalized full name, club and matching birth evidence. Unverified identities stay separate.
+```powershell
+Copy-Item .env.example .env
+```
 
-Live search uses the configured RapidAPI football provider through the server. Unique name/club matches to a verified database player can be signed. Unmatched live profiles are shown as profile-only because the search response does not contain verified position or individual performance statistics. Requests are queued and briefly cached; quota failures leave the local database available.
+Place your player CSVs in `data/`:
 
-The current refresh does not supply individual appearance grades. Their form remains unavailable unless verified normalized evidence is added. No additional statistics provider has been selected or purchased. The extension point is the ignored `data/player-evidence.json` file, which accepts canonical player IDs with minutes, metrics and appearances (date, fixture, grade, minutes), validated on load in `server/catalog-v3.ts`. Team playing style uses the explicit limited-data fallback because current sources lack sufficient tactical evidence.
+```text
+data/
+  players_data-2026_2027.csv
+  players_data_light-2026_2027.csv
+```
 
-Refresh runs as one server-side job, limited to eight football-data.org requests per minute. Concurrent requests share the job. Valid responses replace files atomically; invalid or unavailable sources retain previous data. The UI shows progress and partial failures. New prices apply outside league seasons; an over-budget squad must be adjusted before another match.
+The importer merges matching full/light records and creates `data/players.sqlite` automatically. Use the full file for the richest statistics; the light file supplies overlapping or supplementary fields. To populate or update provider-backed opponents, configure `FOOTBALL_DATA_KEY` and run:
 
-## Code and persistence
+```sh
+npm run refresh:data
+```
 
-The frontend is native HTML, CSS and JavaScript: `index.html`, `src/app.js`, `src/view.js` and `src/style.css`. No React or UI framework remains. `src/game/` contains the shared JavaScript engines, contracts and validated IndexedDB storage. `server/` retains TypeScript for database import, normalization, refresh and server-only APIs. Vite builds the static frontend; fonts are bundled locally.
+Start the production preview:
 
-New saves use a separate efos-rebuilt database. Previous efos-console/localStorage saves remain untouched and exportable from Club settings. Invalid saves are archived, and revision checks prevent silent overwrites by another tab.
+```sh
+npm run build
+npm start
+```
 
-Matches advance minute by minute. Managers can pause/resume, change speed, alter formation and issue tactical instructions. Halftime pauses automatically. Recorded events cannot be rewritten by later instructions. An optional fast-forward completes the same session, rather than rerolling a result. Both sides' scores, stats and performance grades derive from its events.
+Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)**. For development with live reload, use `npm run dev`.
 
-Optional Gemini analysis uses GEMINI_API_KEY with a locally verified default of `gemini-2.5-flash`; GEMINI_MODEL can override it. Gemini receives structured simulated facts and cannot alter scores. The local factual report always works without Gemini.
+A fresh clone needs its own data or a successful provider refresh before meaningful squad building and opponent selection are available. The browser tests also include a scenario that requires the local CSV database.
 
-## Checks
+## Configuration
 
-`npm run check` runs type checks, unit tests, simulation calibration and a production build. `npm run test:e2e` runs isolated browser scenarios on localhost port 3100, primarily using synthetic fixtures. Install Playwright Chromium if needed.
+All provider requests run on the server. Never put API keys in frontend code.
 
-Calibration uses five batches of 10,000 fixed seeds for equal teams, strength advantage, chemistry and positional damage. This is a game model, not a real-world prediction service. All release and hosting changes require a separate approval.
+| Variable | Purpose |
+| --- | --- |
+| `HOST` | Preview address; defaults to `127.0.0.1` for local access. |
+| `PORT` | Server port; defaults to `3000`. |
+| `FOOTBALL_DATA_KEY` | Football-data.org squads, competitions, and results. |
+| `RAPIDAPI_KEY` | Optional live player search. |
+| `RAPIDAPI_HOST` | Live-search provider hostname, supplied in `.env.example`. |
+| `GEMINI_API_KEY` | Optional post-match analysis. |
+| `GEMINI_MODEL` | Optional model override; the implementation defaults to `gemini-2.5-flash`. |
+
+`.env`, `data/`, generated builds, and test artifacts are ignored by Git. Original provider scripts are preserved as local inputs and are never executed by the application. The server blocks access to private data paths.
+
+## Budgets and team building
+
+| Difficulty | Starting points |
+| --- | ---: |
+| Easy | 120 |
+| Medium | 100 |
+| Hard | 85 |
+| Very Hard | 70 |
+
+Custom budgets range from **55–200 points**. Difficulty changes purchasing power, while match rules remain the same. Auto-select builds a legal eleven within the budget; an incomplete or over-budget squad cannot start a match.
+
+Available formations are **4-3-3, 4-4-2, 4-2-3-1, 3-5-2, and 5-3-2**. The saved shortlist contains up to 15 players per position group: GK, DEF, MID, and FWD. Search covers the wider local database. Desktop shows the pitch and player selection together; mobile offers separate Pitch and Players views.
+
+## Ratings, prices, and chemistry
+
+**Player ability** and **match performance** are separate ratings, both out of 10.
+
+Season ability compares available position-specific statistics with peers in the same competition. Small samples shrink toward the position average using `minutes / (minutes + 900)`. The role weights for prevention, distribution, and attack are:
+
+| Position | Prevention | Distribution | Attack |
+| --- | ---: | ---: | ---: |
+| GK | 70% | 30% | 0% |
+| DEF | 60% | 30% | 10% |
+| MID | 20% | 55% | 25% |
+| FWD | 10% | 25% | 65% |
+
+Weights renormalize over available categories. Verified individual appearances can contribute up to 25% of ability, with the newest of the last five weighted most heavily. Missing evidence is excluded; insufficient evidence produces a clearly marked estimate.
+
+```text
+Price = roundToHalf(clamp(3 + 0.22 × (rating − 3)², 3, 15))
+```
+
+Neighboring chemistry links start at 20 points, with bonuses for the same real club (+45), league (+20), and nationality (+15), capped at 100. Positional fit reduces weaker connections. Green, yellow, orange, and red links also include text explanations.
+
+The interface shows raw squad quality, chemistry, and effective strength separately:
+
+```text
+Chemistry = 60% average link score + 40% average positional fit
+Effective strength = quality × positional fit × (0.65 + 0.35 × chemistry / 100)
+```
+
+## Matchday and league seasons
+
+The same seeded engine runs both teams. It models passing, possession, chances, finishing, goalkeeper saves, fatigue, and tactical tradeoffs. Poor chemistry reduces coordinated play, while an attacker placed in defense directly weakens the defensive line.
+
+Matches advance minute by minute. Instructions affect future play without rewriting recorded events. Halftime pauses automatically, and fast-forward completes the same session. Scores, shots, saves, assists, possession, and player grades come from the recorded events.
+
+Opponents are selectable only when their real-player lineup is complete. League mode requires complete domestic-league coverage, adds your club as an extra team, handles byes, and simulates the other fixtures through the same engine. A season freezes its catalog and prices so a refresh cannot change competitive conditions midway through it.
+
+Gemini receives structured match facts to write richer analysis. It does **not** choose the winner or change the score. The factual report remains available when Gemini is disabled or unavailable.
+
+## Data coverage and current limits
+
+- The local CSV database supplies season evidence; football-data.org and FPL provide additional squad, results, and statistics coverage.
+- Live search can sign uniquely matched database players. Unmatched profiles remain profile-only when verified position data is unavailable.
+- Individual last-five appearance grades are not supplied by the current CSVs or live-search response. Form stays unavailable unless verified evidence is added to `data/player-evidence.json`.
+- Cross-provider identities merge only when the required matching evidence is unique; ambiguous records stay separate.
+- Playing style uses a limited-data fallback when tactical statistics are insufficient.
+- Provider refreshes are queued and rate-limited. Partial failures retain the last valid data, and price changes outside an active season may require budget adjustments.
+
+EFOS is a football game model, not a real-world result prediction service. Provider availability and quotas determine live coverage.
+
+## Project structure
+
+```text
+index.html          Native frontend entry
+src/app.js          Screens, navigation, and match controls
+src/view.js         Pitch and reusable HTML rendering
+src/style.css       Responsive styling and local fonts
+src/game/           Shared ratings, chemistry, simulation, leagues, and saves
+server/             CSV import, SQLite, provider adapters, and local APIs
+scripts/            Development and data-refresh tooling
+tests/              Domain, storage, provider, and browser checks
+public/             Circular crest and favicon
+data/               Private local inputs and database; ignored by Git
+```
+
+The backend uses Express and TypeScript. Vite builds the static frontend, and the game engines are shared JavaScript modules with type declarations. Browser progress uses validated IndexedDB storage with revision checks to prevent silent cross-tab overwrites.
+
+## Verification
+
+```sh
+npm run check          # Type checks, unit tests, calibration, and production build
+npx playwright install chromium
+npm run test:e2e       # Browser scenarios on localhost port 3100
+```
+
+The engine calibration runs five batches of 10,000 fixed seeds to check equal-team symmetry, strength advantage, chemistry penalties, and positional damage. Browser coverage includes setup, persistence, search, budget accounting, goalkeeper locks, responsive layouts, league play, and interactive match controls.
+
+## License
+
+[MIT](LICENSE) · Created by [ranaumarbilal31](https://github.com/ranaumarbilal31).
