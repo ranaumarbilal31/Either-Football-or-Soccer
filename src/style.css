@@ -219,12 +219,13 @@ nav a.active {
 }
 .landing h1 {
   font-size: clamp(60px, 8vw, 120px);
-  letter-spacing: -6px;
+  letter-spacing: 0.045em;
   line-height: 1.03;
   font-weight: 500;
   margin-bottom: 32px;
 }
 .landing h1 em {
+  font-style: normal;
   font-family: inherit;
   font-weight: 400;
   color: var(--accent);
@@ -994,7 +995,7 @@ th {
   }
   .landing h1 {
     font-size: 65px;
-    letter-spacing: -3.5px;
+    letter-spacing: 0.045em;
   }
   .landing-content > p:not(.eyebrow) {
     font-size: 15px;
@@ -1185,9 +1186,12 @@ h6,
   text-transform: uppercase;
 }
 .landing h1 {
-  font-size: clamp(32px, 4.4vw, 68px);
+  font-size: clamp(28px, 4vw, 60px);
   line-height: 1.65;
   word-spacing: 0.16em;
+  letter-spacing: 0.045em;
+  font-weight: 400;
+  color: #f7faf2;
 }
 .page-title h1 {
   font-size: clamp(24px, 2.3vw, 37px);
@@ -1603,7 +1607,7 @@ dialog .primary {
     padding: 20px 4vw;
   }
   .landing h1 {
-    font-size: clamp(28px, 6vw, 45px);
+    font-size: clamp(24px, 5.6vw, 36px);
   }
   .setup-layout h1 {
     font-size: 26px;
