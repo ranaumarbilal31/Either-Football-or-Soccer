@@ -8,3 +8,5 @@ playwright-report/
 *.log
 .env*
 !.env.example
+# Local provider scripts and samples may contain private credentials.
+/data/
