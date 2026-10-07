@@ -10,7 +10,3 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
-      - key: TRUST_PROXY
-        value: "1"
-      - key: PLAYER_PROVIDER
-        value: sportsdb
