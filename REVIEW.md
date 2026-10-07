@@ -1,39 +1,29 @@
-# Rebuild verification
+# Rebuild review
 
-The pre-rebuild implementation is preserved in local commit `ca66a57` for rollback. The rebuild replaces its giant dashboard, bundled player catalog, pricing UI, AI endpoints, localStorage state architecture and match engine.
+The previous dashboard, sidebar, pages, state store, rating engine, simulation and obsolete provider adapters have been replaced. The repository, original logo, private data and previous browser saves remain intact.
 
-## Implemented
+The new experience starts empty, supports skip/automatic setup, uses a 100-point default budget, and places pitch beside player search. Shared ratings and chemistry power prices, opponent previews and every fixture. League seasons add the user's club and freeze data.
 
-- Dedicated Squad, Players, Match and Insights routes; persistent mobile navigation and a desktop sidebar.
-- Paginated player discovery, preserved search/page/scroll position, detail dialogs, shortlist and comparison.
-- New game schema, central squad validation, all five formations, locked acquisition costs and seeded simulation.
-- Versioned IndexedDB autosave, multiple named clubs, revision-conflict detection, legacy migration and validated backups.
-- Free provider-backed profiles, explicit coverage/freshness labels, bounded caching, throttling, upstream validation and no fabricated search fallback.
-- Local fonts, navy/ivory/orange theme, original crest/favicon, initials avatars and responsive charts.
-- Production CSP/security headers, source-file isolation, environment validation and graceful shutdown.
+The frontend now uses plain HTML, CSS and JavaScript. React, its dependencies and the old UI files have been removed. Monoton is bundled locally for all headings, including the highlighted home text. The requested slogans and shared data footer have been removed; the circular favicon and SVG background remain. Desktop pitch and player selection panels have more room without clipping the goalkeeper.
 
-## Checked locally
+The two user CSVs merge into a local SQLite player database with 2,071 unique players. Its 60-player shortlist contains 15 per position group, with the wider database available through search. Live search and Gemini generation were both verified through the localhost server; credentials remain private. Gemini defaults to the verified gemini-2.5-flash model.
 
-- Strict TypeScript, regression tests and production build pass on Node 22, matching Render and CI.
-- 15 domain/API/provider/persistence tests pass.
-- Five browser scenarios pass: mobile navigation/details/comparison, full save/play/export/import, provider and malformed import errors, production security/responsive layout, and match playback.
-- Responsive checks at 360, 390, 768 and 1440 pixels found no horizontal page overflow.
-- Actual free-provider search, team-list and roster requests succeeded. The first discovery feed contained 28 playable/profile records after filtering staff.
-- Default-provider images are excluded pending image-specific licence verification.
-- Production dependency audit: zero known vulnerabilities at the verification time.
+Limitations: verified individual last-five form is not present in these CSVs or the live-search response. Unmatched live profiles lack position evidence and cannot be signed. Unsupported abilities remain labelled estimates, and opponent playing styles use a limited-data fallback.
 
-## Limits
+The match screen supports minute-by-minute play, pause/resume, speed, halftime, tactical instructions and formation changes. Later instructions affect future events, never the recorded past. Fast-forward uses the same session. Both teams receive event-derived statistics and player grades.
 
-- Free-provider coverage is a small discovery sample and limited name search, not a global current-season catalog. Profile fetch dates cannot guarantee the source's club-update date.
-- The selected free profile endpoints do not supply sufficient validated performance statistics; OVR and attributes are positional baselines, visibly labeled. Players of the same role have the same baseline values.
-- Existing Render environment has RapidAPI configuration, but the old public search endpoint returned authorization errors. The optional original adapter remains unverified and is not selected by default.
-- No paid provider, paid hosting upgrade, account service or cloud-save database was introduced.
-- Local automated browser tests use fixture responses; separate real-provider API checks establish availability, not universal data accuracy.
-- The initial rebuild (`f5de5a6`) passed GitHub Actions and was deployed to the existing Render service. Public health returned version 2, the CSP was present, the server bundle returned 404, and the real player feed returned 28 records. A subsequent correction ensures defensive midfielders map to MID and 4-2-3-1 displays its two midfield lines.
+Checks cover budgets, positions, identity matching, refresh failures, save conflicts, league scheduling, frozen data and both-team grades. Five 10,000-seed batches verified calibration: the stronger 90-versus-60 team won 86.93%, with 393 upsets. Equal-team wins were 3,700 versus 3,783. Moving forwards into defense increased conceded goals from 8,799 to 11,922 in the positional comparison.
 
-## Hosting changes
+## Review pass
 
-- Existing Render service and free plan retained; no new paid resources.
-- Build changed to `npm ci --include=dev && npm run build`.
-- Added Node 22, production mode, trusted-proxy count 1, explicit public origin and `PLAYER_PROVIDER=sportsdb` environment configuration. Existing private keys were not displayed, replaced or removed.
-- Health-check path set to `/api/health`; existing `npm run start` invokes the production startup script.
+A follow-up review fixed one silent data-loss bug and one hot-path performance defect, then removed the scaffolding the migration left behind.
+
+Progress used to stop saving after 50 matches. The app trimmed its match history to 100 while the save validator accepted at most 50, so once the array crossed 50 every save threw, was swallowed into the storage notice, and the game could no longer persist. A single `matchLimit` in `src/game/types.js` now feeds both the trim in `src/app.js` and the schema in `src/game/validation.js`, and a regression test pins the two together.
+
+`catalog()` rebuilt the whole merged catalog on every request, including a SQLite read, roughly 2,000 JSON parses and an O(n²) identity scan, and live search called it again on every query. Both the merged catalog and the loaded player list are now memoized on the provider revision and CSV mtimes that also drive refresh invalidation. The live-search cache is capped and pruned instead of growing without bound.
+
+Removed: the unused `StatisticsProvider` interface, the unused `seeded` and `edges` exports (both functions kept as internals), the file-local `roleFrom` and `appearanceSchema` exports, a duplicated `normal()` helper, a no-op club alias, an unreachable branch in `playView()`, an unused `emptySquad` import, an unread `PLAYER_PROVIDER` test setting, a duplicated screenshot call, the unused `prettier` dependency, four unused `tsconfig.json` flags, and dead or byte-identical CSS rules. The match report's performance list no longer carries a numbered rank badge, per the project rule against decorative numbering.
+
+No commit, push or deployment was made. Review the localhost preview before approving a release.
+
+After this pass, `npm run lint`, all 15 automated tests and the production build pass, including the fifteenth test covering the match-history limit and the five 10,000-seed simulation batches. The 14 browser scenarios in `npm run test:e2e` have not been re-run since the pass.
