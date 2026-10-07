@@ -1186,7 +1186,8 @@ h6,
 }
 .landing h1 {
   font-size: clamp(32px, 4.4vw, 68px);
-  line-height: 1.5;
+  line-height: 1.65;
+  word-spacing: 0.16em;
 }
 .page-title h1 {
   font-size: clamp(24px, 2.3vw, 37px);
