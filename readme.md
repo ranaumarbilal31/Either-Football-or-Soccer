@@ -2,15 +2,38 @@
   <img src="public/logo.webp" alt="EFOS crest" width="96" />
 </p>
 
-<h1 align="center">Either Football or Soccer</h1>
+<h1 align="center">⚽ Either Football or Soccer</h1>
 
-<p align="center">Build your club. Find your chemistry. Take control on matchday.</p>
+<p align="center"><strong>Build your club. Find your chemistry. Take control on matchday.</strong></p>
+
+<p align="center">Real players. A club of your own. Every decision starts on your touchline.</p>
+
+<p align="center">
+  <a href="https://either-football-or-soccer.onrender.com">▶ Live demo</a> ·
+  <a href="#-ratings-prices-and-chemistry">🧠 How it works</a> ·
+  <a href="#-run-locally">🚀 Run locally</a> ·
+  <a href="https://github.com/ranaumarbilal31/Either-Football-or-Soccer/issues">🐛 Report an issue</a>
+</p>
+
+<p align="center">
+  <img alt="HTML5" src="https://img.shields.io/badge/HTML5-native-E34F26?logo=html5&amp;logoColor=white" />
+  <img alt="CSS" src="https://img.shields.io/badge/CSS-responsive-663399?logo=css&amp;logoColor=white" />
+  <img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-plain-F7DF1E?logo=javascript&amp;logoColor=black" />
+  <img alt="Node.js 22.13 or newer" src="https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=nodedotjs&amp;logoColor=white" />
+  <img alt="SQLite player database" src="https://img.shields.io/badge/SQLite-player_database-003B57?logo=sqlite&amp;logoColor=white" />
+  <img alt="Gemini optional analysis" src="https://img.shields.io/badge/Gemini-optional_analysis-8E75B2?logo=googlegemini&amp;logoColor=white" />
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/License-MIT-A3CB38" /></a>
+</p>
+
+---
+
+## 🏟️ Overview
 
 EFOS is a football squad builder and management simulation with real player data, a points-based transfer budget, and an interactive touchline. Pick your eleven, connect the right players, and test your approach against real clubs or national teams.
 
 The frontend uses **plain HTML, CSS, and JavaScript**, with locally bundled Monoton headings and a responsive pitch-and-player workspace. Match outcomes come from a seeded game engine; optional Gemini analysis explains the result afterward.
 
-## What you can do
+## 🎮 What you can do
 
 - **Create your club:** choose a team name, manager, difficulty, and budget, or skip setup and start with an empty pitch.
 - **Build an eleven:** search players, filter the database, assign players by click or drag-and-drop, and choose from five formations. Goalkeepers stay locked to goal.
@@ -20,7 +43,7 @@ The frontend uses **plain HTML, CSS, and JavaScript**, with locally bundled Mono
 - **Review performances:** inspect event-derived statistics, both teams' player grades, match reports, and season rankings.
 - **Keep your progress:** save locally in your browser, export your game, and preserve previous-version saves in an archive.
 
-## Run locally
+## 🚀 Run locally
 
 **Requirements:** Node.js **22.13 or newer** and npm. Player CSVs and provider snapshots are local inputs; they are not included in this repository.
 
@@ -61,7 +84,7 @@ Open **[http://127.0.0.1:3000](http://127.0.0.1:3000)**. For development with li
 
 A fresh clone needs its own data or a successful provider refresh before meaningful squad building and opponent selection are available. The browser tests also include a scenario that requires the local CSV database.
 
-## Configuration
+## 🔑 Configuration
 
 All provider requests run on the server. Never put API keys in frontend code.
 
@@ -77,7 +100,7 @@ All provider requests run on the server. Never put API keys in frontend code.
 
 `.env`, `data/`, generated builds, and test artifacts are ignored by Git. Original provider scripts are preserved as local inputs and are never executed by the application. The server blocks access to private data paths.
 
-## Budgets and team building
+## 👕 Budgets and team building
 
 | Difficulty | Starting points |
 | --- | ---: |
@@ -90,7 +113,7 @@ Custom budgets range from **55–200 points**. Difficulty changes purchasing pow
 
 Available formations are **4-3-3, 4-4-2, 4-2-3-1, 3-5-2, and 5-3-2**. The saved shortlist contains up to 15 players per position group: GK, DEF, MID, and FWD. Search covers the wider local database. Desktop shows the pitch and player selection together; mobile offers separate Pitch and Players views.
 
-## Ratings, prices, and chemistry
+## 🧠 Ratings, prices, and chemistry
 
 **Player ability** and **match performance** are separate ratings, both out of 10.
 
@@ -118,7 +141,7 @@ Chemistry = 60% average link score + 40% average positional fit
 Effective strength = quality × positional fit × (0.65 + 0.35 × chemistry / 100)
 ```
 
-## Matchday and league seasons
+## 🏆 Matchday and league seasons
 
 The same seeded engine runs both teams. It models passing, possession, chances, finishing, goalkeeper saves, fatigue, and tactical tradeoffs. Poor chemistry reduces coordinated play, while an attacker placed in defense directly weakens the defensive line.
 
@@ -128,7 +151,7 @@ Opponents are selectable only when their real-player lineup is complete. League 
 
 Gemini receives structured match facts to write richer analysis. It does **not** choose the winner or change the score. The factual report remains available when Gemini is disabled or unavailable.
 
-## Data coverage and current limits
+## 📊 Data coverage and current limits
 
 - The local CSV database supplies season evidence; football-data.org and FPL provide additional squad, results, and statistics coverage.
 - Live search can sign uniquely matched database players. Unmatched profiles remain profile-only when verified position data is unavailable.
@@ -139,7 +162,7 @@ Gemini receives structured match facts to write richer analysis. It does **not**
 
 EFOS is a football game model, not a real-world result prediction service. Provider availability and quotas determine live coverage.
 
-## Project structure
+## 🗂️ Project structure
 
 ```text
 index.html          Native frontend entry
@@ -156,7 +179,7 @@ data/               Private local inputs and database; ignored by Git
 
 The backend uses Express and TypeScript. Vite builds the static frontend, and the game engines are shared JavaScript modules with type declarations. Browser progress uses validated IndexedDB storage with revision checks to prevent silent cross-tab overwrites.
 
-## Verification
+## ✅ Verification
 
 ```sh
 npm run check          # Type checks, unit tests, calibration, and production build
@@ -166,6 +189,6 @@ npm run test:e2e       # Browser scenarios on localhost port 3100
 
 The engine calibration runs five batches of 10,000 fixed seeds to check equal-team symmetry, strength advantage, chemistry penalties, and positional damage. Browser coverage includes setup, persistence, search, budget accounting, goalkeeper locks, responsive layouts, league play, and interactive match controls.
 
-## License
+## 📄 License
 
 [MIT](LICENSE) · Created by [ranaumarbilal31](https://github.com/ranaumarbilal31).
