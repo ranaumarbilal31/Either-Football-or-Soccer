@@ -199,7 +199,8 @@ export async function setupExpress() {
   const port = Number(process.env.PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("Invalid PORT");
-  return app.listen(port, process.env.HOST || "127.0.0.1", () =>
-    console.log(`EFOS local preview: http://127.0.0.1:${port}`),
+  const host = process.env.HOST || (process.env.RENDER === "true" ? "0.0.0.0" : "127.0.0.1");
+  return app.listen(port, host, () =>
+    console.log(`EFOS server listening: http://${host}:${port}`),
   );
 }
