@@ -9,7 +9,11 @@ export default defineConfig({
   webServer: {
     command: "npm run start",
     url: "http://127.0.0.1:3100/api/health",
-    env: { PORT: "3100", PLAYER_PROVIDER: "sportsdb", RAPIDAPI_KEY: "" },
+    env: {
+      HOST: "127.0.0.1",
+      PORT: "3100",
+      RAPIDAPI_KEY: "",
+    },
     reuseExistingServer: false,
   },
 });
