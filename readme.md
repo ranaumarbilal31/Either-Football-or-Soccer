@@ -1,72 +1,45 @@
-# Either Football or Soccer
+# EFOS — build your club, then play
 
-A free football squad sandbox. Discover real player profiles, build an XI within a credit budget, set tactics, play a simulated match and use the report to improve your squad.
+A rebuilt football management and simulation app with a clean setup flow, a pitch-first squad builder, and no sidebar or decorative numbering.
 
-## Run
+## Local preview
 
-Node 22.12 or newer within the Node 22 release line is required. Render and CI use Node 22.
+Use Node 22.13 or newer. Run `npm ci`, configure `.env` from `.env.example`, then `npm run build` and `npm start`. Open http://127.0.0.1:3000. Use `npm run dev` for development. Original CSVs and existing provider snapshots remain in the ignored `data/` directory.
 
-```sh
-npm ci
-npm run dev
-```
+`data/` and `.env` are ignored by Git. Keep the original provider script and private key there; the app reads saved responses and never executes that script. FOOTBALL_DATA_KEY is used only on the server. Do not push or deploy without explicit user approval.
 
-Open http://localhost:3000. No paid subscription or API key is required for the default provider. Copy `.env.example` to `.env` for optional server configuration.
+## Club and squad
 
-```sh
-npm run check
-npm run test:e2e
-npm start
-```
+Get started opens setup. Skip starts an empty club at 100 points; Auto-select creates a legal eleven within budget. Easy provides 120 points, Medium 100, Hard 85, Very Hard 70; custom budgets range from 55–200. Difficulty changes purchasing power only.
 
-`check` runs TypeScript, domain/API/persistence tests and the production build. Browser tests require `npx playwright install chromium`, or set `PLAYWRIGHT_CHANNEL=msedge` to use Edge. `npm start` serves the production build and API together. The preview script uses the same production server. Use `npx prettier --write src server tests server.ts` to format changes.
+Desktop keeps pitch and players together; mobile uses Pitch/Players views. The saved list contains 15 players per position group. Search covers the full catalog. Goalkeepers are locked to goal. Shared clubs, leagues, nationality and positional fit determine chemistry links. Complete your eleven before choosing a real club or international opponent.
 
-## The console
+A league adds Your FC as an extra club, schedules every opponent home and away, includes fair byes, and freezes its catalog and prices for the season. Every fixture uses the same symmetric, seeded game engine. Both teams receive match grades and season rankings.
 
-- Squad: lineup, five formations, tactics, budget, named clubs, undo and backups.
-- Players: paginated discovery, search, role filters, profiles, shortlist and two-player comparison. Mobile navigation always remains available. The catalog has no nested scrolling area.
-- Match: three original training opponents, deterministic simulation, pause/speed controls and instant results.
-- Insights: match statistics, individual ratings, local coaching, recent matches and an accessible OVR/cost chart.
+## Ratings and real data
 
-React Router owns navigation, Zustand owns validated game state, TanStack Query owns remote queries and IndexedDB stores local progress. Pure domain modules own pricing, squad constraints and the seeded match engine. No AI service is called.
+Ability and simulated performance are separate ratings out of 10. Season ability uses position-specific category weights and percentiles within the same position/competition, with sample shrinkage `minutes / (minutes + 900)`. Up to 25% comes from verified individual last-five appearance grades, weighted newest first. Missing data is not treated as zero. Price is `roundToHalf(clamp(3 + 0.22 * (rating - 3)^2, 3, 15))` points.
 
-## Player data and its limits
+The selectable player database imports `players_data-2026_2027.csv` and `players_data_light-2026_2027.csv` into local SQLite at `data/players.sqlite`. Matching full/light rows merge without duplicating players; missing evidence stays missing. Position-specific season statistics drive the ratings. Football-data.org and FPL retain real opponent coverage and result-derived club strength. Cross-provider identity links require a unique normalized full name, club and matching birth evidence. Unverified identities stay separate.
 
-Default: [TheSportsDB free v1 API](https://www.thesportsdb.com/documentation), using its documented public key. The discovery sample requests three provider-listed English clubs, with up to ten records per club. Coaches and retired records are excluded. Name searches are limited by the provider to one result. The UI never claims this is a complete league database.
+Live search uses the configured RapidAPI football provider through the server. Unique name/club matches to a verified database player can be signed. Unmatched live profiles are shown as profile-only because the search response does not contain verified position or individual performance statistics. Requests are queued and briefly cached; quota failures leave the local database available.
 
-Player identity and club come from the provider. Fetch dates show when the app retrieved data, not when a club transfer occurred. Provider data can be incomplete or outdated. Search failures never turn into fake players. Empty results stay empty. Previously discovered players remain available locally.
+The current refresh does not supply individual appearance grades. Their form remains unavailable unless verified normalized evidence is added. No additional statistics provider has been selected or purchased. The extension point is the ignored `data/player-evidence.json` file, which accepts canonical player IDs with minutes, metrics and appearances (date, fixture, grade, minutes), validated on load in `server/catalog-v3.ts`. Team playing style uses the explicit limited-data fallback because current sources lack sufficient tactical evidence.
 
-Successful responses are cached for 24 hours in a bounded server cache. During failures, the server can serve a marked stale entry for up to seven days. Provider calls are deduplicated, concurrency-limited and rate-limited. The default provider budget is 25 requests/minute per process, below its documented 30/minute allowance; shared-key limits may still apply. Caches reset on deployment. This app uses one Render instance; multi-instance deployment would require shared limiting and caching.
+Refresh runs as one server-side job, limited to eight football-data.org requests per minute. Concurrent requests share the job. Valid responses replace files atomically; invalid or unavailable sources retain previous data. The UI shows progress and partial failures. New prices apply outside league seasons; an over-budget squad must be adjusted before another match.
 
-The provider's [terms](https://www.thesportsdb.com/docs_terms_of_use.php) allow endpoint content use subject to image and third-party rights. Because record artwork flags do not establish each image's licence, this release uses original initials avatars rather than unverified player images. The existing EFOS logo is retained.
+## Code and persistence
 
-`PLAYER_PROVIDER=rapidapi` retains an optional adapter for the original provider. It uses only the fixed original host and requires `RAPIDAPI_KEY`. It supports name search only. Its current subscription entitlement and payload have not been verified: the existing public site's search was authorization-protected. Do not enable it until its free entitlement and mapping pass integration checks. No paid fallback is configured.
+The frontend is native HTML, CSS and JavaScript: `index.html`, `src/app.js`, `src/view.js` and `src/style.css`. No React or UI framework remains. `src/game/` contains the shared JavaScript engines, contracts and validated IndexedDB storage. `server/` retains TypeScript for database import, normalization, refresh and server-only APIs. Vite builds the static frontend; fonts are bundled locally.
 
-## Game model
+New saves use a separate efos-rebuilt database. Previous efos-console/localStorage saves remain untouched and exportable from Club settings. Invalid saves are archived, and revision checks prevent silent overwrites by another tab.
 
-Profiles and estimated attributes are separate. Available supported attributes can feed the versioned formula; current free profile responses have no validated performance attributes, so version 1 uses explicitly labeled positional baselines. Players of the same natural role therefore share baseline ratings and costs. These are not official ratings or actual transfer values.
+Matches advance minute by minute. Managers can pause/resume, change speed, alter formation and issue tactical instructions. Halftime pauses automatically. Recorded events cannot be rewritten by later instructions. An optional fast-forward completes the same session, rather than rerolling a result. Both sides' scores, stats and performance grades derive from its events.
 
-OVR is a positional weighted average of the six game attributes. Cost is `max(20, round(30 + (OVR - 50)^2 / 14))`. Acquired player prices are locked until release or replacement. Budgets range from 500–5,000 credits, with 1,000 by default. A squad cannot exceed its budget, duplicate a player or place a goalkeeper outfield.
+Optional Gemini analysis uses GEMINI_API_KEY with a locally verified default of `gemini-2.5-flash`; GEMINI_MODEL can override it. Gemini receives structured simulated facts and cannot alter scores. The local factual report always works without Gemini.
 
-Matches require all 11 slots. The seeded engine uses snapshot attributes, position fit, passing, pace, defense, keeper ability, tempo, line height and pressing fatigue. Score, shots, xG and passing totals derive from match events. Animated playback and instant results use the same simulation. Opponents are original training teams. Results are game simulations, not real-match predictions.
+## Checks
 
-## Saves and recovery
+`npm run check` runs type checks, unit tests, simulation calibration and a production build. `npm run test:e2e` runs isolated browser scenarios on localhost port 3100, primarily using synthetic fixtures. Install Playwright Chromium if needed.
 
-IndexedDB holds schema version 2: up to 30 named squads, 2,000 discovered players, a shortlist and the latest 50 match snapshots. Autosaves use revisions and serialized writes. A competing browser tab pauses persistence with an export/reload notice instead of overwriting newer data.
-
-Valid old localStorage squads, tactics, purchase prices and assignments are migrated once. Original keys are never deleted. Old identities remain `legacy:` records until the user chooses a provider replacement; name matching is never used to merge identities. Corrupt records are skipped during legacy recovery. Storage failures preserve an in-memory session with an export warning. Import/export uses validated JSON limited to 8 MB. Imports replace the active collection and can be undone.
-
-## API and hosting
-
-- `GET /api/health`: process health, independent of provider availability.
-- `GET /api/v1/data-status`: provider and coverage information.
-- `GET /api/v1/players?q=&role=ALL&sort=name&page=1`: up to 20 normalized records, total/pages, provider and stale status. Sort is `name`, `rating` or `cost`.
-- `GET /api/v1/players/:providerIdentity`: refresh a supported profile.
-
-Errors use `{ "error": "message" }`. Queries and upstream payloads are validated. Credentials remain server-only; fixed provider URLs prevent user-directed credential forwarding. Helmet headers, production CSP, same-origin checks, request throttling, timeouts and static-file isolation are enabled. This public sandbox has no accounts; origin checks and in-memory limits are not authentication.
-
-Render configuration is in `render.yaml`: `npm ci --include=dev && npm run build`, `npm start`, and `/api/health`. Set `TRUST_PROXY=1` only for the known Render proxy and set `PUBLIC_ORIGIN` to the public HTTPS origin. `PLAYER_PROVIDER=sportsdb` is the free default. Free Render instances can sleep and take time to wake; no paid upgrade is required or performed.
-
-## Licence
-
-See [LICENSE](LICENSE). Original logo and repository licensing are retained. Player-source data has separate provider terms.
+Calibration uses five batches of 10,000 fixed seeds for equal teams, strength advantage, chemistry and positional damage. This is a game model, not a real-world prediction service. All release and hosting changes require a separate approval.
